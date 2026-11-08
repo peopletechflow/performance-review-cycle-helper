@@ -17,3 +17,9 @@
 
 ## 0.1.0 (2026-11-08)
 - First release, fixture only.
+
+## Unreleased: Workday Agent Gateway alignment
+- Added Agent Gateway mode: ASU OAuth 2.1 + PKCE session (`pnpm asu:login`), runtime paginated discovery with drift checks and list_changed refresh, an approved tool policy, and the `workday_*` agent tools. Writes are re-checked for contract drift at commit.
+- Fixed capability mappings are off on Agent Gateway endpoints. Production refuses fixture mode, example config, and fixed bearer tokens.
+- Corrected the docs: catalog WIDs are tool identifiers; tenant scope is not claimed either way.
+- Skill prompts no longer name upstream Workday tools.

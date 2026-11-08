@@ -33,7 +33,7 @@ test("catalog preserves every tenant-verified name and WID exactly, and the mapp
 
 test("skill allowed-tools only name exposed secured tools, never raw upstream write names", async () => {
   const { app } = await setup();
-  const exposed = new Set(app.tools.map((t) => t.name));
+  const exposed = new Set([...app.tools.map((t) => t.name), "workday_list_agent_tools", "workday_read", "workday_preview_write", "workday_commit_write"]);
   for (const s of ["performance-mine-skill", "performance-draft-skill", "performance-submit-skill"]) {
     const md = readFileSync(new URL(`../skills/${s}/SKILL.md`, import.meta.url), "utf8");
     const line = md.match(/^allowed-tools:\s*(.+)$/m)![1];

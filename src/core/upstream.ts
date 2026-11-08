@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { z } from "zod";
+import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 
 /** Upstream said the call failed (isError). Treated as a definitive failure for writes. */
 export class UpstreamToolError extends Error { constructor(m: string) { super(m); this.name = "UpstreamToolError"; } }
@@ -10,8 +11,8 @@ export class UpstreamUnknownError extends Error { constructor(m: string) { super
 /** The capability has no verified mapping for this tenant. */
 export class CapabilityGated extends Error { constructor(readonly capability: string, reason: string) { super(`'${capability}' is not available: ${reason}`); this.name = "CapabilityGated"; } }
 
-export type UpstreamTool = { name: string; inputSchema: { properties?: Record<string, unknown>; required?: string[] } };
-export interface Upstream { listTools(): Promise<UpstreamTool[]>; call(name: string, args: Record<string, unknown>, timeoutMs: number): Promise<{ isError: boolean; data: unknown }>; close(): Promise<void> }
+export type UpstreamTool = { name: string; description?: string; inputSchema: { type?: string; properties?: Record<string, unknown>; required?: string[]; [k: string]: unknown }; outputSchema?: Record<string, unknown>; annotations?: Record<string, unknown> };
+export interface Upstream { listTools(): Promise<UpstreamTool[]>; onToolsChanged(cb: () => void): void; call(name: string, args: Record<string, unknown>, timeoutMs: number): Promise<{ isError: boolean; data: unknown }>; close(): Promise<void> }
 
 /** Upper bound on one upstream tool result after the SDK has parsed it (second line of defence). */
 export const MAX_UPSTREAM_TEXT = 1_000_000;
@@ -45,15 +46,27 @@ export function byteLimitedFetch(limit = MAX_UPSTREAM_RESPONSE_BYTES, base: type
 }
 
 /** Official MCP SDK client. Redirects are refused so the bearer token is never replayed to another origin. The caller's own bearer token is attached to every request; there is no shared token. */
-export async function connectUpstream(opts: { url: string; accessToken: string } | { transport: Transport }): Promise<Upstream> {
+/** Bearer source: a fixed token (dev only) or a provider that returns a fresh token per request (ASU sessions). */
+export type TokenSource = string | (() => Promise<string>);
+
+export async function connectUpstream(opts: { url: string; accessToken: TokenSource } | { transport: Transport }): Promise<Upstream> {
   const client = new Client({ name: "workday-mcp-task-gateway", version: "0.2.0" });
   const transport = "transport" in opts ? opts.transport : (() => {
     const u = new URL(opts.url);
     if (u.protocol !== "https:" && !["127.0.0.1", "localhost", "[::1]"].includes(u.hostname)) throw new Error("WORKDAY_MCP_URL must use https (http only for loopback).");
-    return new StreamableHTTPClientTransport(u, { requestInit: { headers: { Authorization: `Bearer ${opts.accessToken}` }, redirect: "error" }, fetch: byteLimitedFetch() });
+    const tok = opts.accessToken;
+    const authed: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const t = typeof tok === "string" ? tok : await tok();
+      const h = new Headers(init?.headers); h.set("Authorization", `Bearer ${t}`);
+      return fetch(input, { ...init, headers: h, redirect: "error" });
+    }) as typeof fetch;
+    return new StreamableHTTPClientTransport(u, { fetch: byteLimitedFetch(MAX_UPSTREAM_RESPONSE_BYTES, authed) });
   })();
+  const changed: (() => void)[] = [];
+  client.setNotificationHandler(ToolListChangedNotificationSchema, async () => { for (const cb of changed) cb(); });
   await client.connect(transport);
   return {
+    onToolsChanged(cb) { changed.push(cb); },
     async listTools() {
       const out: UpstreamTool[] = []; let cursor: string | undefined;
       do { const r = await client.listTools(cursor ? { cursor } : undefined); out.push(...(r.tools as UpstreamTool[])); cursor = r.nextCursor; } while (cursor && out.length < 2000);
@@ -142,13 +155,14 @@ export class Gateway {
   private readonly status = new Map<string, CapabilityStatus>();
   private constructor(private readonly up: Upstream | undefined, private readonly mapping: Mapping | undefined, private readonly defs: Record<string, CapabilityDef>, private readonly timeoutMs: number) {}
 
-  static async create(up: Upstream | undefined, mapping: Mapping | undefined, defs: Record<string, CapabilityDef>, opts: { timeoutMs?: number; disabled?: readonly string[] } = {}): Promise<Gateway> {
+  static async create(up: Upstream | undefined, mapping: Mapping | undefined, defs: Record<string, CapabilityDef>, opts: { timeoutMs?: number; disabled?: readonly string[]; agentReadyEndpoint?: boolean } = {}): Promise<Gateway> {
     const g = new Gateway(up, mapping, defs, opts.timeoutMs ?? 15_000);
     const tools = up ? new Map((await up.listTools()).map((t) => [t.name, t])) : new Map<string, UpstreamTool>();
     for (const [cap, def] of Object.entries(defs)) {
       const set = (status: "available" | "gated", reason?: string, upstreamTool?: string) => g.status.set(cap, { capability: cap, kind: def.kind, status, reason, upstreamTool });
       const m = mapping?.capabilities[cap];
       if (opts.disabled?.includes(cap)) { set("gated", "disabled by operator (kill switch)"); continue; }
+      if (opts.agentReadyEndpoint) { set("gated", "Workday Agent-Ready tools are for AI agent use only and change without versioning; fixed capability mappings are off. Use the workday_* agent tools."); continue; }
       if (!up) { set("gated", "no upstream Workday MCP server configured"); continue; }
       if (!m) { set("gated", "no tenant mapping configured"); continue; }
       if (/^REPLACE/i.test(m.tool)) { set("gated", "placeholder tool name from the example mapping; set the real upstream tool name", m.tool); continue; }

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "approvedBy": "EXAMPLE - replace with the reviewer",
+  "approvedAt": "EXAMPLE",
+  "tenantAlias": "your_tenant_alias",
+  "agentClientId": "your_asor_agent_client_id",
+  "tools": [
+    { "name": "example_identity_tool", "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000", "access": "read", "subject": { "contextInstanceId": "me" }, "identity": { "workerIdPath": "data.0.id" }, "note": "Pick from `pnpm agent-tools:snapshot`; fingerprints come from the live tools/list." },
+    { "name": "example_read_tool", "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000", "access": "read", "subject": { "worker": "caller" } }
+  ]
+}

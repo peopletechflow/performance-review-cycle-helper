@@ -26,6 +26,7 @@ export class LiveUnsupported extends Error {
 export function readMode(env: NodeJS.ProcessEnv): Mode {
   const m = (env.MODE ?? "fixture").trim();
   if (m !== "fixture" && m !== "live") throw new Error(`MODE must be fixture or live, got '${m}'`);
+  if (m === "fixture" && env.NODE_ENV === "production") throw new Error("NODE_ENV=production refuses fixture mode (invented example data).");
   return m;
 }
 

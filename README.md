@@ -62,7 +62,7 @@ Workflow ready in `docs/ci-workflow.example.yml`; enabling it needs the `workflo
 
 ## Workday App Builder catalog (tenant-verified)
 
-The 17 Workday App Builder tool names and WIDs in `src/catalog.ts` were supplied by the tenant owner, who confirmed them as tenant-verified on 2026-11-08. WIDs are specific to that tenant. `examples/workday-app-builder.mapping.json` maps every capability to those exact tool names. Call `get_workday_catalog` to see each tool, its WID, the secured tool that exposes it, and whether it is mapped.
+The 17 Workday App Builder tool names and WIDs in `src/catalog.ts` were supplied by the tenant owner, who confirmed them as tenant-verified on 2026-11-08. They are catalog tool IDs (the IDs MCP Explorer lists and an ASOR agent definition references), not personal or credential data. In Agent Gateway mode they are reference material only; live discovery and the approved tool policy decide what can be called. `examples/workday-app-builder.mapping.json` maps every capability to those exact tool names. Call `get_workday_catalog` to see each tool, its WID, the secured tool that exposes it, and whether it is mapped.
 
 What is verified, and what is still open:
 
@@ -79,3 +79,30 @@ What is verified, and what is still open:
 Secured tools: `collect_evidence` (Workday sources `wd_<tool>`, opt-in, reports ok/empty/access_denied), `get_my_open_review`, `get_review_period_suggestion`, `get_goal_status`, `get_my_review_step_status`, `preview_/commit_goal_update` (edit_worker_goals, then submit_worker_goal_events if chosen), `preview_/commit_anytime_feedback` (create_anytime_feedback_events; recipient must come from your own feedback request).
 
 Repo-local skills: `skills/performance-mine-skill`, `skills/performance-draft-skill`, `skills/performance-submit-skill`. Their `allowed-tools` list only these secured tools, never the raw upstream write names (a test enforces this).
+
+## Workday Agent Gateway mode (the documented Workday path)
+
+Based on Workday's public docs, read 2026-11-08:
+- Agent-Ready MCP Tools: https://developer.workday.com/documentation/GUID-949559e7-10c3-438a-abb2-e452c23d9da8-enHYPHENus/AgentReadyMCPTools
+- Connect an External Agent with Workday MCP: https://developer.workday.com/documentation/GUID-03605c39-71d3-4314-bf71-97f274df457c-enHYPHENus/ConnectanExternalAgentwithWorkdayMCP
+- Developer Guidelines & Change Policy: https://developer.workday.com/documentation/GUID-04498a6d-10ba-4a41-a917-9fa668641b8d-enHYPHENus/WorkdayAgentReadyMCPToolsDeveloperGuidelinesChangePolicy
+- Discover Available Agent-Ready MCP Tools (MCP Explorer, Agent Resource Search): https://developer.workday.com/documentation/GUID-f86470b2-4283-48e6-8d7e-18c91c470878-enHYPHENus
+- Configure External Agents / Authenticate Agents to Agent Gateway: https://doc.workday.com/admin-guide/en-us/workday-ai/agents/external-agents/configure-external-agents.html and https://doc.workday.com/admin-guide/en-us/workday-ai/agents/onboard-partner-agent-to-agent-gateway.html
+
+Operator steps in Workday (this repository cannot do them): set up ASOR; register the agent and its skills and tools; configure it (enable skills, choose security groups, set the redirect URI); copy the one-time client ID and secret; activate it, which creates the Agent System User (ASU); and configure security policies for the agent's skills.
+
+Runtime:
+1. Run `pnpm asu:login` (with `WORKDAY_AGENT_GATEWAY`, `WORKDAY_TENANT_ALIAS`, `ASU_CLIENT_ID`, `ASU_CLIENT_SECRET_FILE`, `ASU_REDIRECT_URI` and `ASU_SESSION_FILE` set). It walks through the authorization code flow with PKCE: `GET https://{gateway}/auth/authorize/{tenant}`, then `POST https://{gateway}/auth/oauth2/{tenant}/token`. The session file is written with mode 600.
+2. Run `pnpm agent-tools:snapshot` (read only). It lists the tools this agent can see, with contract fingerprints. Write `AGENT_TOOL_POLICY_PATH` from it after review; `examples/agent-tool-policy.example.json` shows the format.
+3. `MODE=live pnpm start`. The server connects to `https://{gateway}/{tenant}/mcp` with the ASU token and resolves the worker through the policy's identity tool. It then exposes `workday_list_agent_tools`, `workday_read`, `workday_preview_write` and `workday_commit_write`.
+
+Behaviour:
+- Discovery is paginated. The tool list is refreshed on `notifications/tools/list_changed`, after a 5-minute TTL, and always right before a commit.
+- A renamed, removed or schema-changed tool turns off until it is re-approved. Description rewrites are not treated as changes.
+- If a write tool's contract changes between preview and commit, nothing is sent.
+- Person arguments are filled from the authenticated worker. Manager, HR and payroll tools are never exposed.
+- The fixed review tools (`commit_submission` and the others) are off in this mode, because Workday's tools are for agents only and must not be hard-coded.
+
+Access tokens last 60 minutes (documented) and are refreshed before expiry. The refresh request shape is not in the public docs, so it uses the standard OAuth `refresh_token` grant. Any refresh failure ends the session and requires signing in again; nothing falls back to another credential. Revoking access is a Workday-side action (deactivate the agent). Ambient (x509 JWT) agents are not implemented. Not yet run against a live tenant.
+
+Direct mapping mode (`WORKDAY_MCP_URL` + a fixed token file) is for other MCP servers you run yourself, outside production only. A fixed bearer token is not an ASU session.

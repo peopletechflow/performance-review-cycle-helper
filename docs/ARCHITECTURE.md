@@ -44,3 +44,6 @@ None of these is called directly. Live access goes through an upstream Workday M
 2. Evidence it runs as the signed-in worker via per-user OAuth, scoped to that worker, with no integration-system user.
 3. Recorded non-production request and response, field mapping to `exactSubmission`, business-process step behavior, duplicate detection, error shapes.
 4. Per evidence provider: per-user OAuth with read-only scopes, the user's own items only, opt-in per source.
+
+## Workday Agent Gateway mode (2026-11-08)
+`src/core/asu.ts` handles ASU delegate OAuth: PKCE, the documented authorize and token endpoints, a session bound to gateway, tenant, agent client and worker, and refresh that fails closed. `src/core/agentready.ts` does paginated discovery, list_changed and TTL refresh, contract fingerprints, the approved tool policy, server-side subject binding, and live-schema validation (Ajv). `src/core/agent-tools.ts` exposes the `workday_*` tools; writes are preview, confirm, then a fingerprint re-check at commit. `src/core/live.ts` chooses Agent Gateway mode or non-production direct mapping mode. Fixed capability mappings are off on Agent Gateway endpoints.

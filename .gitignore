@@ -15,3 +15,7 @@ secrets/
 *.token
 mapping.local.json
 role-map.local.json
+
+*.session.json
+asu-session*.json
+agent-tool-policy.json

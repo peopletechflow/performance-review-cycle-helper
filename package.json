@@ -16,7 +16,9 @@
     "test": "node --import tsx --test test/*.test.ts",
     "test:pg": "node --import tsx --test --test-concurrency=1 test/*.test.ts",
     "check": "pnpm run typecheck && pnpm run test",
-    "mapping:check": "tsx scripts/mapping-check.ts"
+    "mapping:check": "tsx scripts/mapping-check.ts",
+    "asu:login": "tsx scripts/asu-login.ts",
+    "agent-tools:snapshot": "tsx scripts/agent-tools-snapshot.ts"
   },
   "engines": {
     "node": ">=22"
@@ -25,6 +27,7 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.5.15",
     "@modelcontextprotocol/sdk": "^1.32.1",
+    "ajv": "^8.20.0",
     "pg": "^8.23.1",
     "zod": "^4.6.7"
   },

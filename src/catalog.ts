@@ -3,7 +3,12 @@
  *
  * Status of each entry:
  * - Tool name and WID: supplied by the tenant owner and confirmed by them as tenant-verified (2026-11-08).
- *   They identify tools in THAT tenant; WIDs are tenant-specific and are not assumed to exist elsewhere.
+ *   These are catalog tool identifiers, the kind MCP Explorer and the ASOR Agent Resource Search API list and an ASOR
+ *   agent definition references as agent_resource.id. They are not worker, personal or credential data. Workday's
+ *   docs do not say whether a tool WID differs between tenants, so none is claimed either way.
+ * - Use: reference only (get_workday_catalog, operator review). Workday's change policy says Agent-Ready tool names
+ *   and schemas change without versioning and must not be hard-coded, so at runtime only live discovery plus the
+ *   operator-approved tool policy decides what can be called (src/core/agentready.ts).
  * - Input and output schemas: not exported to this repo. The gateway reads each tool's input schema
  *   from tools/list at startup and gates any mapping that does not match. Response shapes are unknown,
  *   so mined records are returned as bounded, quoted data, and writes need a recognizable reference
