@@ -1,7 +1,7 @@
 {
   "name": "performance-review-cycle-helper",
   "version": "0.2.0",
-  "description": "Performance Review Cycle Helper | Workday MCP: Claude skill plus task-shaped MCP tools to run your own review cycle: opted-in evidence, drafts in your voice, preview and confirmed submission. Fixture-tested; live Workday submission fails closed.",
+  "description": "Performance Review Cycle Helper | Workday MCP: Claude skill plus task-shaped tools over your upstream Workday MCP server to run your own review cycle: opted-in evidence (GitHub), cited drafts in your voice, exact preview and confirmed submission. Tested with fixtures and test doubles; no tenant verified yet.",
   "type": "module",
   "private": true,
   "license": "MIT",
