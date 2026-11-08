@@ -6,20 +6,23 @@
  * - Direct mapping mode (WORKDAY_MCP_URL): for other MCP servers you run yourself, outside production only. It is
  *   refused for Agent Gateway hosts.
  */
-import { chmodSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { readOwnerOnlyJson, writeOwnerOnlyJson } from "./secure-file.js";
 import { z } from "zod";
 import { liveCaller, withTenant, type Caller } from "./identity.js";
 import { connectUpstream, Gateway, type CapabilityDef } from "./upstream.js";
 import { LiveBackend, type Backend } from "./backend.js";
 import { list, loadMapping, loadRoleMap, readSecretFile } from "./config.js";
 import { asuEndpoints, AsuTokenProvider, type AsuConfig, type AsuSession } from "./asu.js";
-import { AgentToolRegistry, ToolPolicyFile } from "./agentready.js";
+import { AgentToolRegistry, ToolPolicyFile, type Ceiling } from "./agentready.js";
 
 const Session = z.object({ gatewayHost: z.string(), tenantAlias: z.string(), clientId: z.string(), workerId: z.string().optional(), accessToken: z.string(), refreshToken: z.string().optional(), expiresAt: z.number() }).strict();
-export const loadSession = (path: string): AsuSession | undefined => { try { return Session.parse(JSON.parse(readFileSync(path, "utf8"))); } catch { return undefined; } };
-export function saveSession(path: string, s: AsuSession | undefined) {
-  const tmp = `${path}.tmp`; writeFileSync(tmp, JSON.stringify(s ?? {}), { mode: 0o600 }); chmodSync(tmp, 0o600); renameSync(tmp, path);
+export function loadSession(path: string): AsuSession | undefined {
+  let raw: unknown;
+  try { raw = readOwnerOnlyJson(path); } catch (e) { if ((e as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw e; }
+  const p = Session.safeParse(raw); return p.success ? p.data : undefined;
 }
+export function saveSession(path: string, s: AsuSession | undefined) { writeOwnerOnlyJson(path, s ?? {}); }
 
 export function asuConfigFromEnv(env: NodeJS.ProcessEnv): AsuConfig {
   const need = ["WORKDAY_AGENT_GATEWAY", "WORKDAY_TENANT_ALIAS", "ASU_CLIENT_ID", "ASU_CLIENT_SECRET_FILE", "ASU_REDIRECT_URI"].filter((k) => !env[k]);
@@ -35,7 +38,7 @@ function assertNotExample(env: NodeJS.ProcessEnv, ...paths: (string | undefined)
 
 export type Live = { backend: Backend; caller: Caller; registry?: AgentToolRegistry; workerIdFor: (c: Caller) => string };
 
-export async function startLive(env: NodeJS.ProcessEnv, caps: Record<string, CapabilityDef>): Promise<Live> {
+export async function startLive(env: NodeJS.ProcessEnv, caps: Record<string, CapabilityDef>, ceilings: readonly Ceiling[] = []): Promise<Live> {
   if (!env.ROLE_MAP_PATH) throw new Error("Live mode needs ROLE_MAP_PATH.");
   if (env.WORKDAY_AGENT_GATEWAY) {
     if (!env.ASU_SESSION_FILE || !env.AGENT_TOOL_POLICY_PATH) throw new Error("Agent Gateway mode needs ASU_SESSION_FILE (from `pnpm asu:login`) and AGENT_TOOL_POLICY_PATH.");
@@ -44,9 +47,10 @@ export async function startLive(env: NodeJS.ProcessEnv, caps: Record<string, Cap
     const policy = ToolPolicyFile.parse(JSON.parse(readFileSync(env.AGENT_TOOL_POLICY_PATH, "utf8")));
     if (policy.tenantAlias !== cfg.tenantAlias || policy.agentClientId !== cfg.clientId) throw new Error("Tool policy was approved for a different tenant or agent registration.");
     const sessionPath = env.ASU_SESSION_FILE;
-    const provider = new AsuTokenProvider(cfg, loadSession(sessionPath), { onChange: (s) => saveSession(sessionPath, s) });
+    let registry: AgentToolRegistry | undefined;
+    const provider = new AsuTokenProvider(cfg, loadSession(sessionPath), { onChange: (s) => saveSession(sessionPath, s), onRefreshed: () => { if (registry) registry.identityRecheck = true; } });
     const up = await connectUpstream({ url: asuEndpoints(cfg).mcp, accessToken: provider.token });
-    const registry = new AgentToolRegistry(up, policy);
+    registry = new AgentToolRegistry(up, policy, ceilings, { onIdentityMismatch: () => provider.signOut() });
     const workerId = await registry.resolveWorkerId();
     provider.bindWorker(workerId);
     const caller = liveCaller({ tenantId: cfg.tenantAlias, workerId }, loadRoleMap(env.ROLE_MAP_PATH));

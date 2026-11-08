@@ -92,15 +92,15 @@ Based on Workday's public docs, read 2026-11-08:
 Operator steps in Workday (this repository cannot do them): set up ASOR; register the agent and its skills and tools; configure it (enable skills, choose security groups, set the redirect URI); copy the one-time client ID and secret; activate it, which creates the Agent System User (ASU); and configure security policies for the agent's skills.
 
 Runtime:
-1. Run `pnpm asu:login` (with `WORKDAY_AGENT_GATEWAY`, `WORKDAY_TENANT_ALIAS`, `ASU_CLIENT_ID`, `ASU_CLIENT_SECRET_FILE`, `ASU_REDIRECT_URI` and `ASU_SESSION_FILE` set). It walks through the authorization code flow with PKCE: `GET https://{gateway}/auth/authorize/{tenant}`, then `POST https://{gateway}/auth/oauth2/{tenant}/token`. The session file is written with mode 600.
+1. Run `pnpm asu:login` (with `WORKDAY_AGENT_GATEWAY`, `WORKDAY_TENANT_ALIAS`, `ASU_CLIENT_ID`, `ASU_CLIENT_SECRET_FILE`, `ASU_REDIRECT_URI` and `ASU_SESSION_FILE` set). It walks through the authorization code flow with PKCE: `GET https://{gateway}/auth/authorize/{tenant}`, then `POST https://{gateway}/auth/oauth2/{tenant}/token`. The session file is written atomically with mode 600, and symlinks or loose permissions are refused.
 2. Run `pnpm agent-tools:snapshot` (read only). It lists the tools this agent can see, with contract fingerprints. Write `AGENT_TOOL_POLICY_PATH` from it after review; `examples/agent-tool-policy.example.json` shows the format.
-3. `MODE=live pnpm start`. The server connects to `https://{gateway}/{tenant}/mcp` with the ASU token and resolves the worker through the policy's identity tool. It then exposes `workday_list_agent_tools`, `workday_read`, `workday_preview_write` and `workday_commit_write`.
+3. `MODE=live pnpm start`. The server connects to `https://{gateway}/{tenant}/mcp` with the ASU token and resolves the worker through the policy's identity tool. It then exposes `workday_list_agent_tools` and one tool per enabled capability ceiling (for example `workday_goals_self_read`). There is no generic call tool, and Agent Gateway writes are off by default. See [docs/AGENT_GATEWAY_SECURITY.md](docs/AGENT_GATEWAY_SECURITY.md).
 
 Behaviour:
 - Discovery is paginated. The tool list is refreshed on `notifications/tools/list_changed`, after a 5-minute TTL, and always right before a commit.
 - A renamed, removed or schema-changed tool turns off until it is re-approved. Description rewrites are not treated as changes.
 - If a write tool's contract changes between preview and commit, nothing is sent.
-- Person arguments are filled from the authenticated worker. Manager, HR and payroll tools are never exposed.
+- Person fields at any depth are filled from the authenticated worker. Schemas that cannot be bound safely are refused, and record ids must come from your own earlier results. The manager, HR and payroll denylist is defence in depth only.
 - The fixed review tools (`commit_submission` and the others) are off in this mode, because Workday's tools are for agents only and must not be hard-coded.
 
 Access tokens last 60 minutes (documented) and are refreshed before expiry. The refresh request shape is not in the public docs, so it uses the standard OAuth `refresh_token` grant. Any refresh failure ends the session and requires signing in again; nothing falls back to another credential. Revoking access is a Workday-side action (deactivate the agent). Ambient (x509 JWT) agents are not implemented. Not yet run against a live tenant.
