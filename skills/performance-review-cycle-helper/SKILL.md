@@ -1,12 +1,14 @@
 ---
-name: review-companion
-description: Use when an employee wants help with their own performance review cycle (self review, requested peer feedback, goals, evidence) and the Review Companion MCP server is connected.
+name: performance-review-cycle-helper
+description: Workday MCP skill. Use when an employee wants help with their own performance review cycle (self review, requested peer feedback, goals, evidence) and the Performance Review Cycle Helper MCP server is connected.
 ---
 
-# Review Companion
+# Performance Review Cycle Helper | Workday MCP
+
+Performance Review Cycle Helper runs as a Workday MCP server; this skill drives it. Fixture mode by default; it does not claim a live Workday connection.
 
 ## Setup
-Connect the `review-companion` MCP server (README quick start). Call `list_integrations` and tell the user which parts are fixture-only. Submission to Workday is not live.
+Connect the `performance-review-cycle-helper` MCP server (README quick start). Call `list_integrations` and tell the user which parts are fixture-only. Submission to Workday is not live.
 
 ## Workflow
 1. `get_my_review_cycle` and `list_my_goals`. Tell the user the due dates.

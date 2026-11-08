@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "review-companion": {
+    "performance-review-cycle-helper": {
       "command": "node",
-      "args": ["/ABSOLUTE/PATH/TO/review-companion/dist/index.js"],
+      "args": ["/ABSOLUTE/PATH/TO/performance-review-cycle-helper/dist/index.js"],
       "env": { "MODE": "fixture", "FIXTURE_USER": "emp_ava" }
     }
   }

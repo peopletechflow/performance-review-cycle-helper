@@ -29,7 +29,7 @@ const DRAFTING_RULES = [
 ];
 const MAX_WINDOW_DAYS = 366;
 
-export function createReviewCompanion(mode: Mode, opts: { now?: () => Date } = {}) {
+export function createPerformanceReviewCycleHelper(mode: Mode, opts: { now?: () => Date } = {}) {
   const now = opts.now ?? (() => new Date());
   const previews = new PreviewStore();
   const idem = new Idempotency();

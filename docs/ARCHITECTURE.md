@@ -1,7 +1,9 @@
-# Architecture
+# Architecture: Performance Review Cycle Helper | Workday MCP
+
+This is a Workday MCP server (stdio). Setup: README quick start.
 
 ```
-Claude + skills/review-companion --stdio--> src/index.ts
+Claude + skills/performance-review-cycle-helper --stdio--> src/index.ts
   resolveCaller()  session identity (fixture: FIXTURE_USER; live: not implemented -> exit)
   buildMcpServer() lists only permitted tools
 src/tools.ts       12 tools, lifecycle state machine

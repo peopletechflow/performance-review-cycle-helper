@@ -1,11 +1,11 @@
 {
-  "name": "review-companion",
+  "name": "performance-review-cycle-helper",
   "version": "0.1.0",
-  "description": "Review Companion: Claude skill plus task-shaped MCP tools to run your own review cycle: opted-in evidence, drafts in your voice, preview and confirmed submission. Fixture-tested; live Workday submission fails closed.",
+  "description": "Performance Review Cycle Helper | Workday MCP: Claude skill plus task-shaped MCP tools to run your own review cycle: opted-in evidence, drafts in your voice, preview and confirmed submission. Fixture-tested; live Workday submission fails closed.",
   "type": "module",
   "private": true,
   "license": "MIT",
-  "bin": { "review-companion": "dist/index.js" },
+  "bin": { "performance-review-cycle-helper": "dist/index.js" },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",

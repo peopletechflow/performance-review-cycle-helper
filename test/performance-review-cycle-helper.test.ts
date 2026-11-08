@@ -6,12 +6,12 @@ import { resolveCaller, type Caller } from "../src/core/identity.js";
 import { buildMcpServer, callTool, visibleTools } from "../src/core/tool.js";
 import { Audit } from "../src/core/audit.js";
 import { USERS } from "../src/fixtures/data.js";
-import { createReviewCompanion } from "../src/tools.js";
+import { createPerformanceReviewCycleHelper } from "../src/tools.js";
 
 const as = (u: string): Caller => resolveCaller("fixture", { FIXTURE_USER: u }, USERS);
 const NOW = () => new Date("2026-11-08T12:00:00Z");
 function setup(mode: "fixture" | "live" = "fixture", now = NOW) {
-  const app = createReviewCompanion(mode, { now }); const audit = new Audit();
+  const app = createPerformanceReviewCycleHelper(mode, { now }); const audit = new Audit();
   const call = (u: string, name: string, args: unknown = {}) => callTool(app.tools, app.roles, audit, as(u), name, args);
   const ok = async (u: string, name: string, args: unknown = {}) => { const r = await call(u, name, args); assert.ok(r.ok, JSON.stringify(r)); return (r as any).data; };
   return { app, audit, call, ok };

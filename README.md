@@ -1,4 +1,6 @@
-# Review Companion
+# Performance Review Cycle Helper | Workday MCP
+
+An independent, task-shaped **Workday MCP** server and Claude skill. Not affiliated with, endorsed by, or certified by Workday, Inc.; Workday is a trademark of Workday, Inc. Live Workday access is not yet verified (see the capability table).
 
 A Claude skill plus a task-shaped MCP server that lets an employee run **their own** performance review cycle: see the cycle and goals, collect evidence from work sources they opted in to, draft a self review or requested peer feedback in their own voice with citations, preview the exact submission, and submit only after confirming.
 
@@ -32,7 +34,7 @@ pnpm install
 pnpm check
 FIXTURE_USER=emp_ava pnpm dev
 ```
-Example users: `emp_ava`, `emp_ben` (submit frozen), `ro_cy` (read only), `emp_zed` (other tenant). For Claude Desktop, `pnpm build` and use `examples/claude_desktop_config.json`; load `skills/review-companion/SKILL.md`.
+Example users: `emp_ava`, `emp_ben` (submit frozen), `ro_cy` (read only), `emp_zed` (other tenant). For Claude Desktop, `pnpm build` and use `examples/claude_desktop_config.json`; load `skills/performance-review-cycle-helper/SKILL.md`.
 
 ## Docs
 [ARCHITECTURE](docs/ARCHITECTURE.md), [SECURITY](docs/SECURITY.md), [HANDOVER](HANDOVER.md), [CHANGELOG](CHANGELOG.md), [AGENTS](AGENTS.md).

@@ -34,7 +34,7 @@ export async function callTool(tools: readonly ToolDef[], roles: RoleTable, audi
   }
 }
 
-export function buildMcpServer(info: { name: string; version: string }, tools: readonly ToolDef[], roles: RoleTable, audit: Audit, caller: Caller): McpServer {
+export function buildMcpServer(info: { name: string; version: string; title?: string }, tools: readonly ToolDef[], roles: RoleTable, audit: Audit, caller: Caller): McpServer {
   const server = new McpServer(info);
   for (const t of visibleTools(tools, caller, roles)) {
     server.registerTool(t.name, { description: `[${t.kind}] ${t.description}`, inputSchema: t.input }, async (args: unknown) => {
