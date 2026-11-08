@@ -19,7 +19,7 @@ export class LiveBackend implements Backend {
   constructor(private readonly g: Gateway) {}
   capabilities() { return this.g.capabilities(); }
   isAvailable(cap: string) { return this.g.isAvailable(cap); }
-  invoke<T>(cap: string, input: Record<string, unknown>) { return this.g.invoke<T>(cap, input); }
+  invoke<T>(cap: string, input: Record<string, unknown>, caller: Caller) { return this.g.invoke<T>(cap, input, caller); }
   sourceSystem(cap: string) { return `workday-mcp:${this.g.capabilities().find((x) => x.capability === cap)?.upstreamTool ?? cap}`; }
 }
 

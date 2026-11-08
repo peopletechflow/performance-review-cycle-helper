@@ -32,7 +32,7 @@ export const CAPS: Record<string, CapabilityDef> = {
   wd_bp_tasks: raw([], "find_business_process_tasks"),
   wd_bp_event: raw(["eventId"], "find_business_process_event"),
   wd_bp_remaining_steps: raw(["eventId"], "find_remaining_steps_for_business_process_event"),
-  wd_anytime_feedback_create: { kind: "write", inputs: ["recipientWorkerId", "feedbackText", "idempotencyKey"], description: "create_anytime_feedback_events", output: writeRef },
+  wd_anytime_feedback_create: { kind: "write", inputs: ["recipientWorkerId", "feedbackText", "idempotencyKey"], description: "create_anytime_feedback_events", output: writeRef, objectInputs: { recipientWorkerId: "aboutWorkerId of one of the caller's own feedback requests (feedback_requests_read), resolved server-side" } },
   wd_goal_edit: { kind: "write", inputs: ["goalId", "progressPercent", "goalNote", "idempotencyKey"], description: "edit_worker_goals", output: writeRef },
   wd_goal_submit: { kind: "write", inputs: ["goalId", "idempotencyKey"], description: "submit_worker_goal_events", output: writeRef },
   review_template_read: { kind: "read", inputs: ["reviewId"], description: "Normalized template with rating scales (needs a verified fieldMap)", output: z.object({
