@@ -100,7 +100,7 @@ Behaviour:
 - Discovery is paginated. The tool list is refreshed on `notifications/tools/list_changed`, after a 5-minute TTL, and always right before a commit.
 - A renamed, removed or schema-changed tool turns off until it is re-approved. Description rewrites are not treated as changes.
 - If a write tool's contract changes between preview and commit, nothing is sent.
-- Person fields at any depth are filled from the authenticated worker. Schemas that cannot be bound safely are refused, and record ids must come from your own earlier results. The manager, HR and payroll denylist is defence in depth only.
+- Person fields at any depth are filled from the authenticated worker. Schemas that cannot be bound safely are refused, and tools that take record ids or free-form text are unavailable, because ownership of ids cannot be proven from Workday's contract. Reads need the tool annotated read-only. The manager, HR and payroll denylist is defence in depth only.
 - The fixed review tools (`commit_submission` and the others) are off in this mode, because Workday's tools are for agents only and must not be hard-coded.
 
 Access tokens last 60 minutes (documented) and are refreshed before expiry. The refresh request shape is not in the public docs, so it uses the standard OAuth `refresh_token` grant. Any refresh failure ends the session and requires signing in again; nothing falls back to another credential. Revoking access is a Workday-side action (deactivate the agent). Ambient (x509 JWT) agents are not implemented. Not yet run against a live tenant.

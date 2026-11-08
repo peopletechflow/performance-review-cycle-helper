@@ -28,7 +28,7 @@ export function agentReadyTools(o: { registry: AgentToolRegistry; store: Store; 
   ];
   for (const ce of o.ceilings.filter((x) => x.enabled)) {
     if (ce.access === "read") {
-      out.push(defineTool({ name: toolNameFor(ce), kind: "read", permission: ce.permission, description: `${ce.description}. Pick a tool listed for capability ${ce.capability} by workday_list_agent_tools. Person fields are filled from your identity; ids must come from your own earlier results.`,
+      out.push(defineTool({ name: toolNameFor(ce), kind: "read", permission: ce.permission, description: `${ce.description}. Pick a tool listed for capability ${ce.capability} by workday_list_agent_tools. Person fields are filled from your identity. Record ids and free-form text are not accepted; use enums, dates and numbers the schema allows.`,
         input: { tool: z.string().max(200), args: Args.default({}) },
         run: async (a, c) => { await consent(c, ce); return { note: UNTRUSTED_NOTE, result: untrusted(JSON.stringify(await registry.read(a.tool, ce.capability, a.args, o.workerId(c), key(c))).slice(0, 60_000)) }; } }));
       continue;
