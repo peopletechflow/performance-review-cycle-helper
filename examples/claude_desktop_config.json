@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "review-companion": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/TO/review-companion/dist/index.js"],
+      "env": { "MODE": "fixture", "FIXTURE_USER": "emp_ava" }
+    }
+  }
+}

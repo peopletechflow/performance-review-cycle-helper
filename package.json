@@ -1,0 +1,22 @@
+{
+  "name": "review-companion",
+  "version": "0.1.0",
+  "description": "Review Companion: Claude skill plus task-shaped MCP tools to run your own review cycle: opted-in evidence, drafts in your voice, preview and confirmed submission. Fixture-tested; live Workday submission fails closed.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "bin": { "review-companion": "dist/index.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "check": "pnpm run typecheck && pnpm run test"
+  },
+  "engines": { "node": ">=20" },
+  "packageManager": "pnpm@10.12.4",
+  "dependencies": { "@modelcontextprotocol/sdk": "^1.32.1", "zod": "^3.25.0" },
+  "devDependencies": { "@types/node": "^22.10.0", "tsx": "^4.19.0", "typescript": "^5.7.0" },
+  "pnpm": { "onlyBuiltDependencies": ["esbuild"] }
+}
