@@ -5,3 +5,13 @@ dist/
 !.env.example
 *.log
 audit/
+
+# Secrets and local data
+local.env
+*.pw
+*.pem
+*.key
+secrets/
+*.token
+mapping.local.json
+role-map.local.json

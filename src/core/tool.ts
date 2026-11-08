@@ -8,7 +8,7 @@ import { CapabilityGated, UpstreamToolError, UpstreamUnknownError } from "./upst
 export type ToolKind = "read" | "propose" | "commit";
 export type ToolDef<S extends ZodRawShape = ZodRawShape> = {
   name: string; kind: ToolKind; permission: string; description: string; input: S;
-  run: (args: z.objectOutputType<S, z.ZodTypeAny>, caller: Caller) => Promise<unknown> | unknown;
+  run: (args: z.output<z.ZodObject<S>>, caller: Caller) => Promise<unknown> | unknown;
 };
 export const defineTool = <S extends ZodRawShape>(t: ToolDef<S>): ToolDef => t as unknown as ToolDef;
 

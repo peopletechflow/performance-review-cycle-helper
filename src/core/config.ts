@@ -11,6 +11,6 @@ export function readSecretFile(path: string, label: string): string {
   return v;
 }
 export const loadMapping = (path: string): Mapping => MappingFile.parse(JSON.parse(readFileSync(path, "utf8")));
-const RoleMap = z.record(z.object({ roles: z.array(z.string()).min(1), denies: z.array(z.string()).optional() }).strict());
+const RoleMap = z.record(z.string(), z.object({ roles: z.array(z.string()).min(1), denies: z.array(z.string()).optional() }).strict());
 export const loadRoleMap = (path: string) => RoleMap.parse(JSON.parse(readFileSync(path, "utf8")));
 export const list = (v?: string) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);

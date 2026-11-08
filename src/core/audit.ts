@@ -2,7 +2,9 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 /** Keys whose values never reach the audit log. Free text is always redacted. */
-const REDACT = /(token|secret|password|authorization|email|phone|ssn|national|birth|address|name|comment|note|reason|text|summary|body|sample|answer|question|content)/i;
+const REDACT = /(token|secret|password|authorization|email|phone|ssn|national|birth|address|name|comment|note|reason|text|summary|body|sample|answer|question|content|json|section|draft|feedback|goal_?note|message)/i;
+/** Any string longer than this is treated as free text and redacted whatever its key. */
+const MAX_PLAIN = 128;
 
 export function redact(v: unknown, depth = 0): unknown {
   if (depth > 6) return "[truncated]";
@@ -10,6 +12,7 @@ export function redact(v: unknown, depth = 0): unknown {
   if (v && typeof v === "object") {
     return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, REDACT.test(k) ? "[REDACTED]" : redact(x, depth + 1)]));
   }
+  if (typeof v === "string" && v.length > MAX_PLAIN) return `[REDACTED ${v.length} chars]`;
   return v;
 }
 

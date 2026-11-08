@@ -13,13 +13,16 @@ export class CapabilityGated extends Error { constructor(readonly capability: st
 export type UpstreamTool = { name: string; inputSchema: { properties?: Record<string, unknown>; required?: string[] } };
 export interface Upstream { listTools(): Promise<UpstreamTool[]>; call(name: string, args: Record<string, unknown>, timeoutMs: number): Promise<{ isError: boolean; data: unknown }>; close(): Promise<void> }
 
-/** Official MCP SDK client. The caller's own bearer token is attached to every request; there is no shared token. */
+/** Upper bound on one upstream tool result, before parsing. */
+export const MAX_UPSTREAM_TEXT = 1_000_000;
+
+/** Official MCP SDK client. Redirects are refused so the bearer token is never replayed to another origin. The caller's own bearer token is attached to every request; there is no shared token. */
 export async function connectUpstream(opts: { url: string; accessToken: string } | { transport: Transport }): Promise<Upstream> {
   const client = new Client({ name: "workday-mcp-task-gateway", version: "0.2.0" });
   const transport = "transport" in opts ? opts.transport : (() => {
     const u = new URL(opts.url);
     if (u.protocol !== "https:" && !["127.0.0.1", "localhost", "[::1]"].includes(u.hostname)) throw new Error("WORKDAY_MCP_URL must use https (http only for loopback).");
-    return new StreamableHTTPClientTransport(u, { requestInit: { headers: { Authorization: `Bearer ${opts.accessToken}` } } });
+    return new StreamableHTTPClientTransport(u, { requestInit: { headers: { Authorization: `Bearer ${opts.accessToken}` }, redirect: "error" } });
   })();
   await client.connect(transport);
   return {
@@ -32,9 +35,11 @@ export async function connectUpstream(opts: { url: string; accessToken: string }
       let r: Awaited<ReturnType<typeof client.callTool>>;
       try { r = await client.callTool({ name, arguments: args }, undefined, { timeout: timeoutMs }); }
       catch (e) { throw new UpstreamUnknownError(`Upstream call failed: ${scrub((e as Error).message)}`); }
+      if (r.structuredContent !== undefined && JSON.stringify(r.structuredContent).length > MAX_UPSTREAM_TEXT) throw new UpstreamToolError(`Workday MCP response for ${name} is too large; refusing to use it.`);
       const data = r.structuredContent ?? (() => {
         const t = (r.content as { type: string; text?: string }[] | undefined)?.find((x) => x.type === "text")?.text;
         if (t === undefined) return undefined;
+        if (t.length > MAX_UPSTREAM_TEXT) throw new UpstreamToolError(`Workday MCP response for ${name} is larger than ${MAX_UPSTREAM_TEXT} characters; refusing to parse.`);
         try { return JSON.parse(t); } catch { return r.isError ? { message: t } : undefined; }
       })();
       return { isError: Boolean(r.isError), data };
@@ -48,11 +53,15 @@ const ArgSpec = z.union([z.object({ from: z.string() }).strict(), z.object({ con
 export const MappingFile = z.object({
   version: z.literal(1),
   verifiedAgainst: z.string().optional(),
-  capabilities: z.record(z.object({ tool: z.string().min(1), args: z.record(ArgSpec).default({}), resultPath: z.string().optional(), fieldMap: z.record(z.string().min(1)).optional() }).strict()),
+  capabilities: z.record(z.string(), z.object({ tool: z.string().min(1), args: z.record(z.string(), ArgSpec).default({}), resultPath: z.string().optional(), fieldMap: z.record(z.string(), z.string().min(1)).optional() }).strict()),
 }).strict();
 export type Mapping = z.infer<typeof MappingFile>;
 
-export type CapabilityDef = { kind: "read" | "write"; inputs: readonly string[]; output: z.ZodTypeAny; description: string };
+export type CapabilityDef = { kind: "read" | "write"; inputs: readonly string[]; output: z.ZodTypeAny; description: string;
+  /** Upstream tools that must never back this capability (for example manager/HR actions behind a self-service write). */
+  denyTools?: readonly string[] };
+/** Argument names that would let a mapping point a call at someone other than the signed-in caller. */
+const TARGET_ARG = /(worker|employee|person|subject|target|user|manager|wid)/i;
 export type CapabilityStatus = { capability: string; kind: "read" | "write"; status: "available" | "gated"; upstreamTool?: string; reason?: string };
 
 /** Remove bearer tokens, long opaque strings, emails and control characters from upstream error text. */
@@ -85,6 +94,10 @@ export class Gateway {
       if (opts.disabled?.includes(cap)) { set("gated", "disabled by operator (kill switch)"); continue; }
       if (!up) { set("gated", "no upstream Workday MCP server configured"); continue; }
       if (!m) { set("gated", "no tenant mapping configured"); continue; }
+      if (/^REPLACE/i.test(m.tool)) { set("gated", "placeholder tool name from the example mapping; set the real upstream tool name", m.tool); continue; }
+      if (def.denyTools?.includes(m.tool)) { set("gated", `upstream tool '${m.tool}' is not allowed for this self-service capability`, m.tool); continue; }
+      const pinned = Object.entries(m.args).filter(([k, a]) => "const" in a && TARGET_ARG.test(k)).map(([k]) => k);
+      if (pinned.length) { set("gated", `mapping pins a person/target argument to a constant (${pinned.join(",")}); identity must come from the caller's own session`, m.tool); continue; }
       const t = tools.get(m.tool);
       if (!t) { set("gated", `upstream tool '${m.tool}' not found in tools/list`); continue; }
       const props = Object.keys(t.inputSchema?.properties ?? {});

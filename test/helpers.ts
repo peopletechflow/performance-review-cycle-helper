@@ -14,7 +14,10 @@ export const as = (u: string): Caller => resolveCaller("fixture", { FIXTURE_USER
 export const NOW = () => new Date("2026-11-08T12:00:00Z");
 
 export async function setup(o: { backend?: Backend; caller?: (u: string) => Caller; providers?: (c: Caller) => EvidenceProvider[]; now?: () => Date } = {}) {
-  const db = await openDb({ allowEmbedded: true });
+  const db = await openDb({ databaseUrl: process.env.TEST_DATABASE_URL, allowEmbedded: true });
+  // Real Postgres runs (TEST_DATABASE_URL, --test-concurrency=1): start every test from an empty schema.
+  if (process.env.TEST_DATABASE_URL && !["127.0.0.1", "localhost", "[::1]"].includes(new URL(process.env.TEST_DATABASE_URL).hostname)) throw new Error("TEST_DATABASE_URL must point at a loopback test database (it is wiped).");
+  if (process.env.TEST_DATABASE_URL) await db.query("drop schema if exists public cascade; create schema public");
   await migrate(db, fileURLToPath(new URL("../db/migrations", import.meta.url)));
   const store = new Store(db);
   const app = createReviewHelper({ backend: o.backend ?? createFixtureBackend(), store, providers: o.providers ?? fixtureProviders, now: o.now ?? NOW });

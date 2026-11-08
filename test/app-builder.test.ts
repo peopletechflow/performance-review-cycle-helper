@@ -113,3 +113,22 @@ test("scrub removes tokens and emails from upstream errors", () => {
   const s = scrub("Bearer abc.def failed for jane@example.com key=" + "A".repeat(50));
   assert.doesNotMatch(s, /abc\.def|jane@|AAAA/);
 });
+
+test("audit redaction: long free text under any key, and JSON section payloads", async () => {
+  const { redact } = await import("../src/core/audit.js");
+  const r = redact({ sectionsJson: "[]", cycleId: "C-1", other: "x".repeat(200) }) as Record<string, string>;
+  assert.equal(r.sectionsJson, "[REDACTED]"); assert.equal(r.cycleId, "C-1"); assert.match(r.other, /^\[REDACTED 200 chars\]$/);
+});
+
+test("oversized upstream result is refused before parsing", async () => {
+  const server = new McpServer({ name: "up", version: "0" });
+  server.tool("big", "", {}, async () => ({ content: [{ type: "text", text: JSON.stringify({ d: "x".repeat(1_100_000) }) }] }));
+  const [a, b] = InMemoryTransport.createLinkedPair(); await server.connect(a);
+  const up = await connectUpstream({ transport: b });
+  await assert.rejects(up.call("big", {}, 5000), /larger than/);
+  await up.close();
+});
+
+test("upstream URL must be https except loopback", async () => {
+  await assert.rejects(connectUpstream({ url: "http://evil.example.com/mcp", accessToken: "t" }), /https/);
+});
