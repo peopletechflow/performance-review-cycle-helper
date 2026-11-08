@@ -25,7 +25,7 @@ export const MAX_UPSTREAM_RESPONSE_BYTES = 2_000_000;
  * (including a long-lived SSE stream) has its own budget.
  */
 export function byteLimitedFetch(limit = MAX_UPSTREAM_RESPONSE_BYTES, base: typeof fetch = fetch): typeof fetch {
-  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+  return (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const res = await base(input, init);
     if (!res.body) return res;
     const declared = Number(res.headers.get("content-length") ?? "NaN");
@@ -55,7 +55,7 @@ export async function connectUpstream(opts: { url: string; accessToken: TokenSou
     const u = new URL(opts.url);
     if (u.protocol !== "https:" && !["127.0.0.1", "localhost", "[::1]"].includes(u.hostname)) throw new Error("WORKDAY_MCP_URL must use https (http only for loopback).");
     const tok = opts.accessToken;
-    const authed: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const authed: typeof fetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
       const t = typeof tok === "string" ? tok : await tok();
       const h = new Headers(init?.headers); h.set("Authorization", `Bearer ${t}`);
       return fetch(input, { ...init, headers: h, redirect: "error" });
@@ -193,7 +193,7 @@ export class Gateway {
   async invoke<T>(cap: string, input: Record<string, unknown>, caller?: { userId: string }): Promise<T> {
     const st = this.status.get(cap); const def = this.defs[cap];
     if (!st || !def || st.status !== "available") throw new CapabilityGated(cap, st?.reason ?? "unknown capability");
-    const m = this.mapping!.capabilities[cap];
+    const m = this.mapping!.capabilities[cap]!;
     const args: Record<string, unknown> = {};
     for (const [k, spec] of Object.entries(m.args)) {
       let v: unknown;
