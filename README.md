@@ -1,46 +1,58 @@
 # Performance Review Cycle Helper | Workday MCP
 
-An independent, task-shaped **Workday MCP** server and Claude skill. Not affiliated with, endorsed by, or certified by Workday, Inc.; Workday is a trademark of Workday, Inc. Live Workday access is not yet verified (see the capability table).
+An independent, task-shaped **Workday MCP** server plus a Claude skill. Not affiliated with, endorsed by, or certified by Workday, Inc.; Workday is a trademark of Workday, Inc.
 
-A Claude skill plus a task-shaped MCP server that lets an employee run **their own** performance review cycle: see the cycle and goals, collect evidence from work sources they opted in to, draft a self review or requested peer feedback in their own voice with citations, preview the exact submission, and submit only after confirming.
+Employees run **their own** review cycle in Claude: see the cycle and goals, collect evidence from sources they opted in to, draft a self review or requested feedback in their own voice with citations, preview the exact submission, and submit through their Workday MCP server only after confirming.
 
-Status: **v0.1, fixture-tested.** All records in `src/fixtures/data.ts` are invented examples. **Live Workday submission is not supported**: it fails closed pending a tenant-specific performance contract (see docs/ARCHITECTURE.md). Live mode refuses to start.
+## How it connects
+```
+Claude --stdio MCP--> Performance Review Cycle Helper --MCP (your token)--> your upstream Workday MCP server
+                         |-- Postgres: drafts, evidence, opt-ins, previews, commits, audit
+                         `-- GitHub REST API (your token, after opt-in)
+```
+
+## Status
+| | Implemented and tested | Live verified |
+| --- | --- | --- |
+| Upstream Workday MCP client, tools/list check, strict schemas, identity | yes, against test-double MCP servers | **no** |
+| Durable Postgres state, unknown outcomes, reconcile | yes (PGlite) | **no** |
+| GitHub evidence adapter (GET /user, GET /search/issues) | yes, against a test double of the documented API | **no live call made** |
+| Fixture mode | yes | n/a |
+
+**Self-review submission:** the code path exists, but no upstream Workday MCP tool for submitting a worker's own self evaluation has been verified for any tenant. Workday's documented Performance_Management web service does not list an operation that completes a worker's own self-evaluation step, so `self_review_submit` stays gated until your upstream server exposes one and it passes the contract check.
 
 ## Lifecycle
-`cycle -> evidence -> draft -> preview -> confirmed submission -> status`. Any edit creates a new draft version and invalidates the previous preview. Submitted drafts are immutable.
+`cycle -> opt-in -> evidence -> draft -> preview -> confirmed submission -> status (reconcile if unknown)`. Edits make a new version and invalidate the preview. Submitted drafts are locked.
 
 ## Capabilities
-
-| Capability | Tool(s) | Fixture | Live |
+| Capability | Tools | Fixture | Live |
 | --- | --- | --- | --- |
-| Integration mode table | `list_integrations` | yes | yes (static) |
-| My cycle, due dates, template, draft status | `get_my_review_cycle` | yes | blocked: Get_Employee_Reviews scoping not proven |
-| My goals | `list_my_goals` | yes | blocked |
-| Feedback I was asked to give | `list_my_feedback_requests` | yes | blocked |
-| My evidence sources and opt-in state | `list_my_evidence_sources` | yes | blocked: no connectors |
-| Evidence from opted-in sources, date window inside the period, own items only, attributed | `collect_evidence` | yes | blocked |
-| Voice samples (data only, session scoped) | `set_voice_samples` | yes | yes (local) |
-| Drafting context and rules | `get_drafting_context` | yes | n/a |
-| Save and edit drafts with evidence citations | `save_draft`, `get_draft` | yes | n/a |
-| Exact preview, then confirmed idempotent submission | `preview_submission`, `commit_submission` | yes (records a fixture submission) | **blocked**: no proven worker self-evaluation submit operation |
+| `identity` (required) | all | example users | mapped upstream tool |
+| `review_cycle_read` | `get_my_review_cycle`, due checks | yes | when mapped |
+| `goals_read` | `list_my_goals`, drafting context | yes | when mapped |
+| `feedback_requests_read` | `list_my_feedback_requests` | yes | when mapped |
+| `self_review_submit`, `peer_feedback_submit`, `submission_status` | `commit_submission`, `reconcile_my_submission` | yes | when mapped and verified (see above) |
+| Evidence: GitHub | `set_evidence_source_opt_in`, `collect_evidence` | n/a | with `GITHUB_TOKEN_FILE` and opt-in |
+| Evidence: chat, docs, mail | | example sources only | not implemented |
 
-"Mines your work automatically" here means: within sources the user opted in to, within a date window they choose inside the review period, and only items they authored. No broad chat or mail scanning. Named providers (code host, docs, chat) are fixture adapters only.
-
-Never: automated ratings, rankings or comparisons, employment-outcome recommendations, inferring sensitive traits, reading what others wrote about anyone. The user is the author; the client model (Claude) drafts, the server generates no text.
+"Mines your work automatically" means: only sources you opted in to, only a window you choose inside the review period, only items you authored. Never ratings, rankings, outcome suggestions or sensitive-trait inference; the user is the author and Claude drafts.
 
 ## Quick start (fixture mode)
 ```bash
 pnpm install
-pnpm check
+pnpm check                      # typecheck + 20 tests
 FIXTURE_USER=emp_ava pnpm dev
 ```
-Example users: `emp_ava`, `emp_ben` (submit frozen), `ro_cy` (read only), `emp_zed` (other tenant). For Claude Desktop, `pnpm build` and use `examples/claude_desktop_config.json`; load `skills/performance-review-cycle-helper/SKILL.md`.
+Claude Desktop: `pnpm build`, use `examples/claude_desktop_config.json`, load `skills/performance-review-cycle-helper/SKILL.md`.
+
+## Live setup
+Same as Internal People Agent: `DATABASE_URL`, `WORKDAY_MCP_URL`, `WORKDAY_MCP_TOKEN_FILE` (your own token, chmod 600), `WORKDAY_MCP_MAPPING_PATH` (from `examples/workday-mcp-mapping.example.json`), `ROLE_MAP_PATH`, then `MODE=live pnpm start`. Optional `GITHUB_TOKEN_FILE` with your own read-only token.
 
 ## Docs
 [ARCHITECTURE](docs/ARCHITECTURE.md), [SECURITY](docs/SECURITY.md), [HANDOVER](HANDOVER.md), [CHANGELOG](CHANGELOG.md), [AGENTS](AGENTS.md).
 
 ## Provenance
-`src/core/` was adapted from `peopletechflow/workday-mcp-schema` at `4bf10b27b025a48b0882d98ab65983fdba271159` (MIT, same copyright holder): preview tokens (now bound to resource, version and content digest), idempotency (now concurrency safe), audit redaction, deny-wins roles. That repository is unchanged; no secrets or tenant data were copied. Its time-off write support does not imply review-write support.
+`src/core/` adapts security ideas from `peopletechflow/workday-mcp-schema` at `4bf10b27b025a48b0882d98ab65983fdba271159` (MIT, same owner). That repository is unchanged; its time-off support does not imply review-write support.
 
 ## CI
-A GitHub Actions workflow is ready in `docs/ci-workflow.example.yml` (install, `pnpm check`, build). Move it to `.github/workflows/ci.yml` from an account with the `workflow` permission to enable it.
+Workflow ready in `docs/ci-workflow.example.yml`; enabling it needs the `workflow` permission.

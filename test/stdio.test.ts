@@ -15,8 +15,8 @@ test("stdio server starts in fixture mode and answers a tool call", async () => 
   await client.close();
 });
 
-test("stdio server refuses to start in live mode", () => {
+test("stdio server refuses to start in live mode without Postgres and upstream config", () => {
   const r = spawnSync(process.execPath, ["--import", "tsx", "src/index.ts"], { env: { PATH: process.env.PATH ?? "", MODE: "live" }, encoding: "utf8", timeout: 20000 });
   assert.notEqual(r.status, 0);
-  assert.match(r.stderr, /not available in live mode/);
+  assert.match(r.stderr, /required in live mode|Live mode needs/);
 });

@@ -1,0 +1,4 @@
+{
+  "REPLACE_TENANT:*": { "roles": ["employee"] },
+  "REPLACE_TENANT:REPLACE_WORKER_ID": { "roles": ["readonly"] }
+}

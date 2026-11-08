@@ -6,3 +6,4 @@
 - Never mark a domain live in `src/adapters.ts` without the contract proof in docs/ARCHITECTURE.md.
 - Fixture data must stay obviously fictional and carry `example: true`.
 - No em dashes in docs or user-facing text.
+- New Workday data needs a capability in `src/capabilities.ts`, a fixture handler and a test-double contract test. New evidence sources implement `EvidenceProvider`, need opt-in, and return only the user's own items.

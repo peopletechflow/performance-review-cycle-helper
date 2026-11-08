@@ -1,11 +1,11 @@
-# Handover
+# Handover: Performance Review Cycle Helper | Workday MCP
 
-**Done:** fixture vertical slice for cycle, goals, opted-in evidence, cited drafts in the user voice, exact preview and confirmed idempotent fixture submission. 15 tests (`pnpm test`).
+**Done (v0.2):** upstream Workday MCP gateway and live identity, Postgres store and migrations, durable opt-ins and evidence, GitHub evidence adapter, draft lifecycle with bound previews, unknown outcomes and reconcile. 20 tests, all with fixture data or test doubles.
 
-**Not done, by design:** any live connector, per-user OAuth sign-in, durable store, remote HTTP transport.
+**Not verified:** any tenant upstream tool; a real self-evaluation submit tool; the `pg` driver against a real server; a live GitHub call.
 
-**Next steps, in order:**
-1. Pick one tenant and one domain (suggested: read of the caller review event). Complete the contract proof in docs/ARCHITECTURE.md.
-2. Add per-user OAuth (reuse the upstream repo's PKCE flow and encrypted token store) and a durable store with migrations for previews, idempotency and audit.
-3. Implement that one live adapter behind the existing tool, keeping output shape and source refs.
-4. Only then add self-evaluation submission, after the submit operation is proven for the tenant.
+**Next steps:**
+1. Map `identity` and `review_cycle_read` for one sandbox tenant and check `list_integrations`.
+2. Find or build an upstream Workday MCP tool that completes the worker's own self-evaluation step through the business process; prove it, then map `self_review_submit` and `submission_status`.
+3. Try GitHub evidence with your own read-only token.
+4. Add other evidence sources only as real adapters with opt-in.

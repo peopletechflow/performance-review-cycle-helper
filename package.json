@@ -1,11 +1,13 @@
 {
   "name": "performance-review-cycle-helper",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Performance Review Cycle Helper | Workday MCP: Claude skill plus task-shaped MCP tools to run your own review cycle: opted-in evidence, drafts in your voice, preview and confirmed submission. Fixture-tested; live Workday submission fails closed.",
   "type": "module",
   "private": true,
   "license": "MIT",
-  "bin": { "performance-review-cycle-helper": "dist/index.js" },
+  "bin": {
+    "performance-review-cycle-helper": "dist/index.js"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -14,9 +16,25 @@
     "test": "node --import tsx --test test/*.test.ts",
     "check": "pnpm run typecheck && pnpm run test"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=22"
+  },
   "packageManager": "pnpm@10.12.4",
-  "dependencies": { "@modelcontextprotocol/sdk": "^1.32.1", "zod": "^3.25.0" },
-  "devDependencies": { "@types/node": "^22.10.0", "tsx": "^4.19.0", "typescript": "^5.7.0" },
-  "pnpm": { "onlyBuiltDependencies": ["esbuild"] }
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.15",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "pg": "^8.23.1",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
 }

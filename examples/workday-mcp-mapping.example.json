@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "verifiedAgainst": "REPLACE: tenant, upstream server name and version, date of contract check",
+  "capabilities": {
+    "identity": { "tool": "REPLACE_upstream_whoami_tool" },
+    "review_cycle_read": { "tool": "REPLACE_upstream_my_review_event_tool" },
+    "goals_read": { "tool": "REPLACE_upstream_my_goals_tool" },
+    "feedback_requests_read": { "tool": "REPLACE_upstream_my_feedback_requests_tool" },
+    "self_review_submit": { "tool": "REPLACE_upstream_self_evaluation_tool", "args": { "review_event_id": { "from": "cycleId" }, "sections": { "from": "sectionsJson" }, "idempotency_key": { "from": "idempotencyKey" } } },
+    "submission_status": { "tool": "REPLACE_upstream_submission_lookup_tool", "args": { "idempotency_key": { "from": "idempotencyKey" } } }
+  }
+}

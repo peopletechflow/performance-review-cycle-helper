@@ -8,16 +8,16 @@ description: Workday MCP skill. Use when an employee wants help with their own p
 Performance Review Cycle Helper runs as a Workday MCP server; this skill drives it. Fixture mode by default; it does not claim a live Workday connection.
 
 ## Setup
-Connect the `performance-review-cycle-helper` MCP server (README quick start). Call `list_integrations` and tell the user which parts are fixture-only. Submission to Workday is not live.
+Connect the `performance-review-cycle-helper` MCP server (README quick start). Call `list_integrations`. Tell the user which capabilities are gated and why (for example, submission may not be available for their tenant). If `exampleData` is true, say the records are examples.
 
 ## Workflow
 1. `get_my_review_cycle` and `list_my_goals`. Tell the user the due dates.
-2. `list_my_evidence_sources`. Ask which opted-in sources and which dates to use (inside the review period). Then `collect_evidence`.
+2. `list_my_evidence_sources`. Ask which sources to opt in to; call `set_evidence_source_opt_in` only after they agree. Ask for a date window inside the review period, then `collect_evidence`.
 3. Ask for 1 to 5 short samples of the user's own writing; `set_voice_samples`.
 4. `get_drafting_context`. Draft section by section in the user's tone. Every claim cites an `evidenceId`, or the user confirms it and you set `userAttested: true`.
 5. `save_draft`, then show the draft and ask for edits. Save each edit.
 6. `preview_submission`; show `exactSubmission` verbatim.
-7. Only after a clear confirmation, `commit_submission` with `confirm: true`, the token and a new idempotency key.
+7. Only after a clear confirmation, `commit_submission` with `confirm: true`, the token and a new idempotency key. If the status is `unknown`, call `reconcile_my_submission`; never resubmit blindly.
 For peer feedback, use `list_my_feedback_requests` and pass `feedbackRequestId`.
 
 ## Rules
