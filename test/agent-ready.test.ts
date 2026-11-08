@@ -170,7 +170,6 @@ async function writeHarness(w: World, roles: Record<string, string[]> = { employ
   const x = await reg(w);
   const { store } = await setup(); const c0 = as("emp_ava"); const c = Object.freeze({ ...c0, roles: [...c0.roles, ...extraRoles] });
   const tl = agentReadyTools({ registry: x.r, store, ceilings: CEIL, listPermission: "rc.read", workerId: (y) => y.userId });
-  await store.createResource(c, "x", {}, {}); // warm
   const run = (n: string, a: unknown) => callTool(tl, roles, store, c, n, a);
   return { ...x, tl, run };
 }
