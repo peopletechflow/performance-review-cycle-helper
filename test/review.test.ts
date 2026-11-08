@@ -19,7 +19,7 @@ async function flow(s: Awaited<ReturnType<typeof setup>>) {
 
 test("focused tool set: review-cycle tools only, no identity args, no rating fields", async () => {
   const { app } = await setup();
-  assert.equal(app.tools.length, 14);
+  assert.equal(app.tools.length, 23);
   for (const t of app.tools) { assert.doesNotMatch(t.name, /payroll|salary|compensation|admin|time_off|benefit|search_workers|rating|rank|passthrough/i); for (const k of ["userId", "tenantId", "employeeId", "workerId", "rating", "score"]) assert.ok(!(k in t.input), `${t.name}.${k}`); }
 });
 
@@ -28,7 +28,7 @@ test("MCP server: read-only user sees no draft or submit tools", async () => {
   const server = buildMcpServer({ name: "t", version: "0" }, app.tools, app.roles, store, as("ro_cy"));
   const [a, b] = InMemoryTransport.createLinkedPair(); const client = new Client({ name: "c", version: "0" });
   await Promise.all([server.connect(a), client.connect(b)]);
-  assert.deepEqual((await client.listTools()).tools.map((t) => t.name).sort(), ["get_my_review_cycle", "list_integrations", "list_my_feedback_requests", "list_my_goals"]);
+  assert.deepEqual((await client.listTools()).tools.map((t) => t.name).sort(), ["get_goal_status", "get_my_open_review", "get_my_review_cycle", "get_my_review_step_status", "get_review_period_suggestion", "get_workday_catalog", "list_integrations", "list_my_feedback_requests", "list_my_goals"]);
   await client.close();
 });
 

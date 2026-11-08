@@ -31,7 +31,7 @@ export async function connectUpstream(opts: { url: string; accessToken: string }
     async call(name, args, timeoutMs) {
       let r: Awaited<ReturnType<typeof client.callTool>>;
       try { r = await client.callTool({ name, arguments: args }, undefined, { timeout: timeoutMs }); }
-      catch (e) { throw new UpstreamUnknownError(`Upstream call failed: ${(e as Error).message.slice(0, 200)}`); }
+      catch (e) { throw new UpstreamUnknownError(`Upstream call failed: ${scrub((e as Error).message)}`); }
       const data = r.structuredContent ?? (() => {
         const t = (r.content as { type: string; text?: string }[] | undefined)?.find((x) => x.type === "text")?.text;
         if (t === undefined) return undefined;
@@ -48,12 +48,22 @@ const ArgSpec = z.union([z.object({ from: z.string() }).strict(), z.object({ con
 export const MappingFile = z.object({
   version: z.literal(1),
   verifiedAgainst: z.string().optional(),
-  capabilities: z.record(z.object({ tool: z.string().min(1), args: z.record(ArgSpec).default({}), resultPath: z.string().optional() }).strict()),
+  capabilities: z.record(z.object({ tool: z.string().min(1), args: z.record(ArgSpec).default({}), resultPath: z.string().optional(), fieldMap: z.record(z.string().min(1)).optional() }).strict()),
 }).strict();
 export type Mapping = z.infer<typeof MappingFile>;
 
 export type CapabilityDef = { kind: "read" | "write"; inputs: readonly string[]; output: z.ZodTypeAny; description: string };
 export type CapabilityStatus = { capability: string; kind: "read" | "write"; status: "available" | "gated"; upstreamTool?: string; reason?: string };
+
+/** Remove bearer tokens, long opaque strings, emails and control characters from upstream error text. */
+export function scrub(msg: string): string {
+  return msg.replace(/Bearer\s+\S+/gi, "Bearer [redacted]").replace(/[A-Za-z0-9_\-+/=]{40,}/g, "[redacted]").replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "[email]").replace(/[\u0000-\u001f]/g, " ").slice(0, 300);
+}
+/** Upstream said the caller lacks access (as opposed to an empty result). */
+export const isAccessDenied = (e: unknown) => e instanceof UpstreamToolError && /\b(403|forbidden|not authori[sz]ed|permission|access denied|security)\b/i.test(e.message);
+
+/** Inputs the upstream may legitimately not accept: date windows are re-applied locally; idempotency falls back to our durable commit table. */
+const OPTIONAL_INPUTS = new Set(["from", "to", "idempotencyKey"]);
 
 const pick = (v: unknown, path?: string) => (path ? path.split(".").reduce<unknown>((o, k) => (o && typeof o === "object" ? (o as Record<string, unknown>)[k] : undefined), v) : v);
 
@@ -81,6 +91,9 @@ export class Gateway {
       const extra = Object.keys(m.args).filter((a) => !props.includes(a));
       const missing = (t.inputSchema?.required ?? []).filter((r) => !(r in m.args));
       const badFrom = Object.values(m.args).flatMap((a) => ("from" in a && !def.inputs.includes(a.from) ? [a.from] : []));
+      const mappedFrom = new Set(Object.values(m.args).flatMap((a) => ("from" in a ? [a.from] : [])));
+      const unmappedInputs = def.inputs.filter((i) => !OPTIONAL_INPUTS.has(i) && !mappedFrom.has(i));
+      if (unmappedInputs.length) { set("gated", `inputs not mapped to an upstream argument: ${unmappedInputs.join(",")} (see tools/list inputSchema for '${m.tool}')`, m.tool); continue; }
       if (extra.length || missing.length || badFrom.length) { set("gated", `mapping does not match upstream schema (unknown args: ${extra.join(",") || "-"}; missing required: ${missing.join(",") || "-"}; invalid sources: ${badFrom.join(",") || "-"})`, m.tool); continue; }
       set("available", undefined, m.tool);
     }
@@ -98,12 +111,14 @@ export class Gateway {
     const args: Record<string, unknown> = {};
     for (const [k, spec] of Object.entries(m.args)) { const v = "const" in spec ? spec.const : input[spec.from]; if (v !== undefined) args[k] = v; }
     const r = await this.up!.call(m.tool, args, this.timeoutMs);
-    if (r.isError) throw new UpstreamToolError(`Workday MCP returned an error for ${cap}: ${String((r.data as { message?: unknown })?.message ?? "no detail").slice(0, 300)}`);
-    const parsed = def.output.safeParse(pick(r.data, m.resultPath));
+    if (r.isError) throw new UpstreamToolError(`Workday MCP returned an error for ${cap}: ${scrub(String((r.data as { message?: unknown })?.message ?? "no detail"))}`);
+    const picked = pick(r.data, m.resultPath);
+    const shaped = m.fieldMap ? Object.fromEntries(Object.entries(m.fieldMap).map(([ours, path]) => [ours, pick(picked, path)])) : picked;
+    const parsed = def.output.safeParse(shaped);
     if (!parsed.success) throw new UpstreamUnknownError(`Workday MCP response for ${cap} does not match the expected contract: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
     return parsed.data as T;
   }
 }
 
 /** Identity contract every tenant mapping must provide: who the token belongs to, per Workday. */
-export const IDENTITY_CAPABILITY: CapabilityDef = { kind: "read", inputs: [], description: "Signed-in worker identity", output: z.object({ tenantId: z.string().min(1).max(128), workerId: z.string().min(1).max(128) }).strip() };
+export const IDENTITY_CAPABILITY: CapabilityDef = { kind: "read", inputs: [], description: "Signed-in worker identity", output: z.object({ tenantId: z.string().min(1).max(128).optional(), workerId: z.string().min(1).max(128) }).strip() };

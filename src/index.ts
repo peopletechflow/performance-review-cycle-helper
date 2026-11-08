@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { fileURLToPath } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { liveCaller, readMode, resolveCaller } from "./core/identity.js";
+import { liveCaller, readMode, resolveCaller, withTenant } from "./core/identity.js";
 import { buildMcpServer } from "./core/tool.js";
 import { migrate, openDb } from "./core/db.js";
 import { Store } from "./core/store.js";
@@ -11,7 +11,7 @@ import { list, loadMapping, loadRoleMap, readSecretFile } from "./core/config.js
 import { USERS } from "./fixtures/data.js";
 import { CAPS } from "./capabilities.js";
 import { createFixtureBackend } from "./fixture-backend.js";
-import { fixtureProviders, githubProvider, type EvidenceProvider } from "./evidence.js";
+import { fixtureProviders, workdayProviders, githubProvider, type EvidenceProvider } from "./evidence.js";
 import type { Caller } from "./core/identity.js";
 import { createReviewHelper } from "./tools.js";
 
@@ -27,14 +27,14 @@ if (mode === "live") {
   const up = await connectUpstream({ url: env.WORKDAY_MCP_URL, accessToken: readSecretFile(env.WORKDAY_MCP_TOKEN_FILE, "WORKDAY_MCP_TOKEN_FILE") });
   const gw = await Gateway.create(up, loadMapping(env.WORKDAY_MCP_MAPPING_PATH), CAPS, { disabled: list(env.DISABLED_CAPABILITIES) });
   if (!gw.isAvailable("identity")) throw new Error("Live mode needs a verified identity capability mapping; refusing to start.");
-  caller = liveCaller(await gw.invoke("identity", {}), loadRoleMap(env.ROLE_MAP_PATH));
+  caller = liveCaller(withTenant(await gw.invoke("identity", {}), env.WORKDAY_TENANT), loadRoleMap(env.ROLE_MAP_PATH));
   backend = new LiveBackend(gw);
 } else {
   caller = resolveCaller(mode, env, USERS);
   backend = createFixtureBackend();
 }
 const github = env.GITHUB_TOKEN_FILE ? githubProvider({ token: readSecretFile(env.GITHUB_TOKEN_FILE, "GITHUB_TOKEN_FILE"), repoAllowlist: list(env.GITHUB_REPO_ALLOWLIST) }) : undefined;
-const providers = (c: Caller): EvidenceProvider[] => [...(mode === "fixture" ? fixtureProviders(c) : []), ...(github ? [github] : [])];
+const providers = (c: Caller): EvidenceProvider[] => [...(mode === "fixture" ? fixtureProviders(c) : []), ...workdayProviders(backend), ...(github ? [github] : [])];
 const app = createReviewHelper({ backend, store, providers });
 const server = buildMcpServer({ name: "performance-review-cycle-helper", version: "0.2.0", title: "Performance Review Cycle Helper | Workday MCP" }, app.tools, app.roles, store, caller, list(env.DISABLED_TOOLS));
 await server.connect(new StdioServerTransport());

@@ -50,3 +50,36 @@ export function githubProvider(opts: { token: string; repoAllowlist?: string[]; 
     },
   };
 }
+
+import { createHash } from "node:crypto";
+import type { Backend } from "./core/backend.js";
+
+/** App Builder read capabilities mined as evidence. Labels name the upstream tool so the user sees the source. */
+export const WORKDAY_MINE = [
+  ["wd_goals", "list_my_goals"], ["wd_plan_assignments", "find_plan_assignments"], ["wd_learning_transcript", "find_learning_transcript"],
+  ["wd_continue_learning", "find_continue_learning"], ["wd_feedback_received", "find_worker_anytime_feedback_received"],
+  ["wd_feedback_given", "find_anytime_feedback_events"], ["wd_history_events", "find_worker_history_events"],
+] as const;
+
+const DATE_KEYS = ["date", "completedOn", "completionDate", "lastUpdated", "effectiveDate", "createdOn", "dueDate"];
+const TITLE_KEYS = ["descriptor", "title", "name", "course", "goal"];
+/** Response schemas are not exported, so records are taken as-is: an array, or the single array property of an object, or the object. */
+export function records(v: unknown): unknown[] {
+  if (Array.isArray(v)) return v.slice(0, 200);
+  if (v && typeof v === "object") { const arrs = Object.values(v).filter(Array.isArray); if (arrs.length === 1) return (arrs[0] as unknown[]).slice(0, 200); return [v]; }
+  return v == null ? [] : [v];
+}
+const field = (r: unknown, keys: string[]) => (r && typeof r === "object" ? keys.map((k) => (r as Record<string, unknown>)[k]).find((x) => typeof x === "string") as string | undefined : undefined);
+
+/** Workday evidence through the upstream Workday MCP, caller-scoped (the upstream runs as the signed-in worker). */
+export function workdayProviders(backend: Backend): EvidenceProvider[] {
+  return WORKDAY_MINE.filter(([cap]) => backend.isAvailable(cap)).map(([cap, tool]) => ({
+    sourceId: `wd_${tool}`, provider: "workday", label: `Workday MCP: ${tool}`, example: backend.mode === "fixture",
+    collect: async (c, from, to) => records(await backend.invoke<unknown>(cap, { from, to }, c)).map((r) => {
+      const json = JSON.stringify(r);
+      const date = field(r, DATE_KEYS)?.slice(0, 10);
+      return { evidenceId: `wd:${tool}:${createHash("sha256").update(json).digest("hex").slice(0, 16)}`, sourceId: `wd_${tool}`, date: date ?? "undated",
+        title: (field(r, TITLE_KEYS) ?? tool).slice(0, 300), text: json.slice(0, 4000), ref: `workday:${tool}`, author: cap === "wd_feedback_received" ? "a colleague (Workday record)" : "you (Workday record)" };
+    }).filter((i) => i.date === "undated" || (i.date >= from && i.date <= to)),
+  }));
+}

@@ -56,3 +56,23 @@ Same as Internal People Agent: `DATABASE_URL`, `WORKDAY_MCP_URL`, `WORKDAY_MCP_T
 
 ## CI
 Workflow ready in `docs/ci-workflow.example.yml`; enabling it needs the `workflow` permission.
+
+## Workday App Builder catalog (tenant-verified)
+
+The 17 Workday App Builder tool names and WIDs in `src/catalog.ts` were supplied by the tenant owner, who confirmed them as tenant-verified on 2026-11-08. WIDs are specific to that tenant. `examples/workday-app-builder.mapping.json` maps every capability to those exact tool names. Call `get_workday_catalog` to see each tool, its WID, the secured tool that exposes it, and whether it is mapped.
+
+What is verified, and what is still open:
+
+| Item | Status |
+|---|---|
+| Tool names and WIDs | Tenant-verified by the tenant owner |
+| Input argument names | Not exported. Run `pnpm mapping:check` (read only: tools/list, no tool calls) and add `args` for inputs such as goalId, eventId, reviewId, and the write fields. Until then those capabilities stay gated and say which input is missing. |
+| Response shapes | Not exported. Mined reads come back as bounded, quoted data. Identity (`find_staffing_workers`) and `goals_read` need `resultPath`/`fieldMap` taken from a recorded response. |
+| Live calls from this repo | Not run yet |
+| Self-evaluation submit | **Gap.** The catalog has no action for this step, so `commit_submission` for self reviews stays gated. Nothing generic is used in its place. |
+| Peer feedback inside a review | **Gap.** `create_anytime_feedback_events` is anytime feedback, which is a separate object. |
+| Reconciling an unknown write | **Gap.** There is no lookup by idempotency key. The user checks Workday. |
+
+Secured tools: `collect_evidence` (Workday sources `wd_<tool>`, opt-in, reports ok/empty/access_denied), `get_my_open_review`, `get_review_period_suggestion`, `get_goal_status`, `get_my_review_step_status`, `preview_/commit_goal_update` (edit_worker_goals, then submit_worker_goal_events if chosen), `preview_/commit_anytime_feedback` (create_anytime_feedback_events; recipient must come from your own feedback request).
+
+Repo-local skills: `skills/performance-mine-skill`, `skills/performance-draft-skill`, `skills/performance-submit-skill`. Their `allowed-tools` list only these secured tools, never the raw upstream write names (a test enforces this).

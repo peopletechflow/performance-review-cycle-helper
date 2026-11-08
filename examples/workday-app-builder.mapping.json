@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "verifiedAgainst": "Tool names and WIDs: tenant-verified by the tenant owner (2026-11-08). Argument names and response paths: not exported yet; run `pnpm mapping:check` against the tenant and fill args / resultPath / fieldMap from what it prints.",
+  "capabilities": {
+    "identity": {
+      "tool": "find_staffing_workers"
+    },
+    "wd_goals": {
+      "tool": "list_my_goals"
+    },
+    "wd_goal_status": {
+      "tool": "find_goal_status"
+    },
+    "wd_plan_assignments": {
+      "tool": "find_plan_assignments"
+    },
+    "wd_learning_transcript": {
+      "tool": "find_learning_transcript"
+    },
+    "wd_continue_learning": {
+      "tool": "find_continue_learning"
+    },
+    "wd_feedback_received": {
+      "tool": "find_worker_anytime_feedback_received"
+    },
+    "wd_feedback_given": {
+      "tool": "find_anytime_feedback_events"
+    },
+    "wd_performance_review": {
+      "tool": "find_performance_review"
+    },
+    "wd_review_template": {
+      "tool": "find_worker_performance_review_template"
+    },
+    "wd_history_events": {
+      "tool": "find_worker_history_events"
+    },
+    "wd_bp_tasks": {
+      "tool": "find_business_process_tasks"
+    },
+    "wd_bp_event": {
+      "tool": "find_business_process_event"
+    },
+    "wd_bp_remaining_steps": {
+      "tool": "find_remaining_steps_for_business_process_event"
+    },
+    "wd_anytime_feedback_create": {
+      "tool": "create_anytime_feedback_events"
+    },
+    "wd_goal_edit": {
+      "tool": "edit_worker_goals"
+    },
+    "wd_goal_submit": {
+      "tool": "submit_worker_goal_events"
+    }
+  }
+}

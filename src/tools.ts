@@ -4,7 +4,9 @@ import type { RoleTable } from "./core/policy.js";
 import { digest } from "./core/preview.js";
 import type { Store } from "./core/store.js";
 import type { Backend } from "./core/backend.js";
-import { CapabilityGated, UpstreamToolError } from "./core/upstream.js";
+import { CapabilityGated, UpstreamToolError, isAccessDenied, scrub } from "./core/upstream.js";
+import { records } from "./evidence.js";
+import { APP_BUILDER_CATALOG, CATALOG_GAPS, CATALOG_PROVENANCE } from "./catalog.js";
 import { defineTool, type ToolDef } from "./core/tool.js";
 import { untrusted, UNTRUSTED_NOTE } from "./core/untrusted.js";
 import type { EvidenceItem, EvidenceProvider } from "./evidence.js";
@@ -37,7 +39,7 @@ export function createReviewHelper(deps: Deps) {
   const example = backend.mode === "fixture";
   const cycle = (c: Caller) => backend.invoke<Cycle>("review_cycle_read", {}, c);
   const myRequest = async (c: Caller, id: string) => {
-    const r = (await backend.invoke<{ requests: { requestId: string; aboutDisplayName: string; questions: string[] }[] }>("feedback_requests_read", {}, c)).requests.find((x) => x.requestId === id);
+    const r = (await backend.invoke<{ requests: { requestId: string; aboutDisplayName: string; aboutWorkerId?: string; questions: string[] }[] }>("feedback_requests_read", {}, c)).requests.find((x) => x.requestId === id);
     if (!r) throw new AccessDenied("Feedback request not found for you."); return r;
   };
   const due = async (c: Caller, kind: Draft["kind"]) => { const cy = await cycle(c); const d = kind === "self_review" ? cy.selfReviewDue : cy.peerFeedbackDue; if (now().toISOString().slice(0, 10) > d) throw new AccessDenied(`The ${kind} step closed on ${d}.`); return cy; };
@@ -45,6 +47,21 @@ export function createReviewHelper(deps: Deps) {
   const payload = (d: Draft) => ({ kind: d.kind, cycleId: d.cycleId, feedbackRequestId: d.feedbackRequestId, sections: d.sections.map((s) => ({ heading: s.heading, text: s.text, evidenceIds: s.evidenceIds })) });
   const provider = (c: Caller, id: string) => { const p = deps.providers(c).find((x) => x.sourceId === id); if (!p) throw new AccessDenied(`Unknown source ${id}.`); return p; };
   const capFor = (d: Draft) => (d.kind === "self_review" ? "self_review_submit" : "peer_feedback_submit");
+
+
+  const ownGoal = async (c: Caller, goalId: string) => {
+    const g = (await backend.invoke<{ goals: { goalId: string; title: string }[] }>("goals_read", {}, c)).goals.find((x) => x.goalId === goalId);
+    if (!g) throw new AccessDenied("That goal is not one of your own goals."); return g;
+  };
+  /** Preview-bound, idempotent single write. Timeouts and transport errors are "unknown", never "not sent". */
+  const write = async (c: Caller, tool: string, cap: string, r: { id: string; version: number; state: string; content: unknown }, a: { previewToken: string; idempotencyKey: string }, kind: string, input: Record<string, unknown>) => {
+    const prior = await store.getCommit(c, tool, a.idempotencyKey);
+    if (prior) { if (prior.digest !== digest(r.content) || prior.resource_id !== r.id) throw new AccessDenied("idempotencyKey was already used for different content."); return { status: prior.status, result: prior.result, digest: prior.digest, replayed: true }; }
+    if (!backend.isAvailable(cap)) throw new CapabilityGated(cap, backend.capabilities().find((x) => x.capability === cap)?.reason ?? "gated");
+    const dg = await store.consumePreview(c, a.previewToken, kind, r.id, r.version, r.content);
+    const out = await store.commitOnce(c, tool, a.idempotencyKey, r.id, dg, async () => { const x = await backend.invoke<{ ref: string }>(cap, { ...input, idempotencyKey: a.idempotencyKey }, c); return { result: x, upstreamRef: x.ref }; }, (e) => (e instanceof UpstreamToolError ? "failed" : "unknown"));
+    return { ...out, digest: dg, note: out.status === "unknown" ? "Outcome unknown (for example a timeout). It may have been applied. Check Workday; do not retry with a new key." : undefined, exampleData: example };
+  };
 
   const tools: ToolDef[] = [
     defineTool({ name: "list_integrations", kind: "read", permission: "rc.read", description: "Workday MCP capabilities (available or gated, and why) and evidence sources.", input: {},
@@ -70,8 +87,15 @@ export function createReviewHelper(deps: Deps) {
         for (const p of ps) if (!(await store.hasConsent(c, `evidence:${p.sourceId}`))) throw new AccessDenied(`Source ${p.sourceId} is not opted in.`);
         const have = new Set((await evidence(c)).map((e) => e.evidenceId));
         const items: (EvidenceItem & { example: boolean })[] = [];
-        for (const p of ps) for (const i of await p.collect(c, a.from, a.to)) { items.push({ ...i, example: p.example }); if (!have.has(i.evidenceId)) { have.add(i.evidenceId); await store.createResource(c, "evidence", i, { sourceId: p.sourceId }, "collected"); } }
-        return { note: UNTRUSTED_NOTE, window: { from: a.from, to: a.to }, items: items.map((i) => ({ evidenceId: i.evidenceId, sourceId: i.sourceId, date: i.date, ref: i.ref, author: i.author, title: untrusted(i.title), text: untrusted(i.text), example: i.example })) };
+        const sources: { sourceId: string; status: "ok" | "empty" | "access_denied" | "unavailable"; count: number; detail?: string }[] = [];
+        for (const p of ps) {
+          let got: EvidenceItem[];
+          try { got = await p.collect(c, a.from, a.to); }
+          catch (e) { sources.push({ sourceId: p.sourceId, status: isAccessDenied(e) ? "access_denied" : "unavailable", count: 0, detail: scrub((e as Error).message) }); continue; }
+          sources.push({ sourceId: p.sourceId, status: got.length ? "ok" : "empty", count: got.length });
+          for (const i of got) { items.push({ ...i, example: p.example }); if (!have.has(i.evidenceId)) { have.add(i.evidenceId); await store.createResource(c, "evidence", i, { sourceId: p.sourceId }, "collected"); } }
+        }
+        return { note: UNTRUSTED_NOTE, window: { from: a.from, to: a.to }, sources, items: items.map((i) => ({ evidenceId: i.evidenceId, sourceId: i.sourceId, date: i.date, ref: i.ref, author: i.author, title: untrusted(i.title), text: untrusted(i.text), example: i.example })) };
       } }),
     defineTool({ name: "set_voice_samples", kind: "propose", permission: "rc.draft", description: "Save short samples of your own writing so drafts match your tone. Stored as data.", input: { samples: z.array(z.string().min(20).max(2000)).min(1).max(5) },
       run: async (a, c) => { await store.createResource(c, "voice", { samples: a.samples }, {}, "active"); return { saved: a.samples.length }; } }),
@@ -148,6 +172,71 @@ export function createReviewHelper(deps: Deps) {
         await store.resolveUnknown(c, tool, a.idempotencyKey, s.found ? "succeeded" : "failed", s, s.submissionRef);
         await store.updateResource(c, d.id, "draft", d.version, ["unknown"], { state: s.found ? "submitted" : "draft" });
         return { status: s.found ? "succeeded" : "failed", result: s, reconciled: true };
+      } }),
+
+    defineTool({ name: "get_workday_catalog", kind: "read", permission: "rc.read", description: "Tenant-verified Workday App Builder tools (names and WIDs) behind this server, which secured tool exposes each, and known gaps.", input: {},
+      run: () => ({ provenance: CATALOG_PROVENANCE, tools: APP_BUILDER_CATALOG.map((t) => ({ ...t, mapped: backend.isAvailable(t.capability) })), gaps: CATALOG_GAPS }) }),
+    defineTool({ name: "get_my_open_review", kind: "read", permission: "rc.read", description: "Your performance review records from Workday (find_performance_review) and, for a reviewId, the template (find_worker_performance_review_template). Rating scales are shown only when Workday returns them.",
+      input: { reviewId: z.string().max(128).optional() },
+      run: async (a, c) => {
+        const reviews = records(await backend.invoke<unknown>("wd_performance_review", {}, c));
+        let template: unknown; let scales: unknown;
+        if (a.reviewId) {
+          if (!reviews.some((r) => JSON.stringify(r).includes(JSON.stringify(a.reviewId)))) throw new AccessDenied("That review is not in your own review records.");
+          if (backend.isAvailable("wd_review_template")) template = await backend.invoke<unknown>("wd_review_template", { reviewId: a.reviewId }, c);
+          if (backend.isAvailable("review_template_read")) scales = await backend.invoke<unknown>("review_template_read", { reviewId: a.reviewId }, c);
+        }
+        return { note: UNTRUSTED_NOTE, reviews: untrusted(JSON.stringify(reviews).slice(0, 20000)), template: template === undefined ? undefined : untrusted(JSON.stringify(template).slice(0, 20000)), ratingScales: scales ?? "not available: choose ratings yourself in Workday", exampleData: example };
+      } }),
+    defineTool({ name: "get_review_period_suggestion", kind: "read", permission: "rc.read", description: "Suggest the evidence window from your active review. Falls back to the calendar year only when no period is found, and says so. Ask the user to confirm before collecting.", input: {},
+      run: async (_a, c) => {
+        try { const cy = await cycle(c); return { from: cy.periodStart, to: cy.periodEnd, basis: "active review cycle", confirmWithUser: true }; } catch (e) { if (!(e instanceof CapabilityGated || e instanceof UpstreamToolError)) throw e; }
+        const y = now().getUTCFullYear();
+        return { from: `${y}-01-01`, to: now().toISOString().slice(0, 10), basis: "calendar-year fallback: no active review period was found", confirmWithUser: true };
+      } }),
+    defineTool({ name: "get_goal_status", kind: "read", permission: "rc.read", description: "Status of one of your own goals (find_goal_status).", input: { goalId: z.string().max(128) },
+      run: async (a, c) => { await ownGoal(c, a.goalId); return { note: UNTRUSTED_NOTE, status: untrusted(JSON.stringify(await backend.invoke<unknown>("wd_goal_status", { goalId: a.goalId }, c)).slice(0, 8000)), exampleData: example }; } }),
+    defineTool({ name: "get_my_review_step_status", kind: "read", permission: "rc.read", description: "Your review business-process tasks, and for an eventId from them, the event and remaining steps. Read only.", input: { eventId: z.string().max(128).optional() },
+      run: async (a, c) => {
+        const tasks = records(await backend.invoke<unknown>("wd_bp_tasks", {}, c));
+        if (!a.eventId) return { note: UNTRUSTED_NOTE, tasks: untrusted(JSON.stringify(tasks).slice(0, 20000)) };
+        if (!tasks.some((t) => JSON.stringify(t).includes(JSON.stringify(a.eventId)))) throw new AccessDenied("That event is not in your own tasks.");
+        const [ev, steps] = await Promise.all([backend.invoke<unknown>("wd_bp_event", { eventId: a.eventId }, c), backend.invoke<unknown>("wd_bp_remaining_steps", { eventId: a.eventId }, c)]);
+        return { note: UNTRUSTED_NOTE, event: untrusted(JSON.stringify(ev).slice(0, 8000)), remainingSteps: untrusted(JSON.stringify(steps).slice(0, 8000)) };
+      } }),
+    defineTool({ name: "preview_anytime_feedback", kind: "propose", permission: "rc.draft", description: "Preview anytime feedback (create_anytime_feedback_events) to a colleague you were asked to give feedback about. Shows the full text. Nothing is sent.",
+      input: { feedbackRequestId: z.string().max(128), feedbackText: z.string().min(1).max(5000) },
+      run: async (a, c) => {
+        const r = await myRequest(c, a.feedbackRequestId);
+        if (!r.aboutWorkerId) throw new AccessDenied("Workday did not return the colleague's worker id for this request, so the recipient cannot be proven.");
+        const p = { recipientWorkerId: r.aboutWorkerId, recipientDisplayName: r.aboutDisplayName, feedbackText: a.feedbackText };
+        const res = await store.createResource(c, "anytime_feedback", p, {}, "previewed");
+        return { feedbackId: res.id, exactSubmission: p, ...(await store.issuePreview(c, "anytime_feedback", res.id, res.version, p)), submitAvailable: backend.isAvailable("wd_anytime_feedback_create"), note: "Full text shown. Confirm only if this is exactly what you want to send." };
+      } }),
+    defineTool({ name: "commit_anytime_feedback", kind: "commit", permission: "rc.submit", description: "Send previewed anytime feedback through create_anytime_feedback_events.",
+      input: { feedbackId: z.string().max(64), previewToken: z.string().max(128), idempotencyKey: z.string().max(128), confirm: z.literal(true) },
+      run: async (a, c) => {
+        const r = await store.getResource<{ recipientWorkerId: string; recipientDisplayName: string; feedbackText: string }>(c, a.feedbackId, "anytime_feedback");
+        return write(c, "commit_anytime_feedback", "wd_anytime_feedback_create", r, a, "anytime_feedback", { recipientWorkerId: r.content.recipientWorkerId, feedbackText: r.content.feedbackText });
+      } }),
+    defineTool({ name: "preview_goal_update", kind: "propose", permission: "rc.draft", description: "Preview a progress update to one of your own goals (edit_worker_goals, then optionally submit_worker_goal_events). Shows every field. Nothing is changed.",
+      input: { goalId: z.string().max(128), progressPercent: z.number().int().min(0).max(100), goalNote: z.string().max(2000).default(""), submitAfterEdit: z.boolean().default(false) },
+      run: async (a, c) => {
+        const g = await ownGoal(c, a.goalId);
+        const p = { goalId: a.goalId, goalTitle: g.title, progressPercent: a.progressPercent, goalNote: a.goalNote, submitAfterEdit: a.submitAfterEdit };
+        const res = await store.createResource(c, "goal_update", p, {}, "previewed");
+        return { goalUpdateId: res.id, exactChange: p, ...(await store.issuePreview(c, "goal_update", res.id, res.version, p)), editAvailable: backend.isAvailable("wd_goal_edit"), submitAvailable: backend.isAvailable("wd_goal_submit"), note: "Confirm only if this exact change is right. Goal business-process approvals still apply." };
+      } }),
+    defineTool({ name: "commit_goal_update", kind: "commit", permission: "rc.submit", description: "Apply the previewed goal update. Stops if the edit outcome is unknown.",
+      input: { goalUpdateId: z.string().max(64), previewToken: z.string().max(128), idempotencyKey: z.string().max(120), confirm: z.literal(true) },
+      run: async (a, c) => {
+        const r = await store.getResource<{ goalId: string; progressPercent: number; goalNote: string; submitAfterEdit: boolean }>(c, a.goalUpdateId, "goal_update");
+        if (r.content.submitAfterEdit && !backend.isAvailable("wd_goal_submit")) throw new CapabilityGated("wd_goal_submit", "not mapped; preview again without submitAfterEdit");
+        const edit = await write(c, "commit_goal_update", "wd_goal_edit", r, a, "goal_update", { goalId: r.content.goalId, progressPercent: r.content.progressPercent, goalNote: r.content.goalNote });
+        if (!r.content.submitAfterEdit || edit.status !== "succeeded") return edit;
+        const sk = `${a.idempotencyKey}_submit`;
+        const sub = await store.commitOnce(c, "commit_goal_submit", sk, r.id, edit.digest, async () => { const x = await backend.invoke<{ ref: string }>("wd_goal_submit", { goalId: r.content.goalId, idempotencyKey: sk }, c); return { result: x, upstreamRef: x.ref }; }, (e) => (e instanceof UpstreamToolError ? "failed" : "unknown"));
+        return { ...edit, submit: sub, note: sub.status === "unknown" ? "Edit applied; submit outcome unknown. Check the goal in Workday before retrying." : undefined };
       } }),
   ];
   return { tools, roles: ROLES };
