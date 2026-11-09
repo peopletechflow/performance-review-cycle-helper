@@ -47,3 +47,32 @@ None of these is called directly. Live access goes through an upstream Workday M
 
 ## Workday Agent Gateway mode (2026-11-08)
 `src/core/asu.ts` handles ASU delegate OAuth: PKCE, the documented authorize and token endpoints, a session bound to gateway, tenant, agent client and worker, and refresh that fails closed. `src/core/agentready.ts` does paginated discovery, list_changed and TTL refresh, contract fingerprints, the approved tool policy, server-side subject binding, and live-schema validation (Ajv). `src/core/agent-tools.ts` exposes one tool per enabled capability ceiling from `src/agent-capabilities.ts`. Writes are disabled by default; when enabled they go preview, confirm, then a fingerprint re-check at commit. See AGENT_GATEWAY_SECURITY.md. `src/core/live.ts` chooses Agent Gateway mode or non-production direct mapping mode. Fixed capability mappings are off on Agent Gateway endpoints.
+
+## Status
+| | Implemented and tested | Live verified |
+| --- | --- | --- |
+| Upstream Workday MCP client, tools/list check, strict schemas, identity | yes, against test-double MCP servers | **no** |
+| Durable Postgres state, unknown outcomes, reconcile | yes (PGlite) | **no** |
+| GitHub evidence adapter (GET /user, GET /search/issues) | yes, against a test double of the documented API | **no live call made** |
+| Fixture mode | yes | n/a |
+
+**Self-review submission:** the code path exists, but no upstream Workday MCP tool for submitting a worker's own self evaluation has been verified for any tenant. Workday's documented Performance_Management web service does not list an operation that completes a worker's own self-evaluation step, so `self_review_submit` stays gated until your upstream server exposes one and it passes the contract check.
+
+## Lifecycle
+`cycle -> opt-in -> evidence -> draft -> preview -> confirmed submission -> status (reconcile if unknown)`. Edits make a new version and invalidate the preview. Submitted drafts are locked.
+
+## Capabilities
+| Capability | Tools | Fixture | Live |
+| --- | --- | --- | --- |
+| `identity` (required) | all | example users | mapped upstream tool |
+| `review_cycle_read` | `get_my_review_cycle`, due checks | yes | when mapped |
+| `goals_read` | `list_my_goals`, drafting context | yes | when mapped |
+| `feedback_requests_read` | `list_my_feedback_requests` | yes | when mapped |
+| `self_review_submit`, `peer_feedback_submit`, `submission_status` | `commit_submission`, `reconcile_my_submission` | yes | when mapped and verified (see above) |
+| Evidence: GitHub | `set_evidence_source_opt_in`, `collect_evidence` | n/a | with `GITHUB_TOKEN_FILE` and opt-in |
+| Evidence: chat, docs, mail | | example sources only | not implemented |
+
+"Mines your work automatically" means: only sources you opted in to, only a window you choose inside the review period, only items you authored. Never ratings, rankings, outcome suggestions or sensitive-trait inference; the user is the author and Claude drafts.
+
+## Provenance
+`src/core/` adapts security ideas from `peopletechflow/workday-mcp-schema` at `4bf10b27b025a48b0882d98ab65983fdba271159` (MIT, same owner). That repository is unchanged; its time-off support does not imply review-write support.
