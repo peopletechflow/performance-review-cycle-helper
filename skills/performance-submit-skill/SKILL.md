@@ -6,7 +6,7 @@ allowed-tools: mcp__performance-review-cycle-helper__list_integrations, mcp__per
 # Preview, confirm, submit
 
 
-Self-evaluation: no approved tool submits the self-evaluation step. `commit_submission` for a self review stays gated. Tell the user to submit it in Workday. Do not use any other business-process or manager tool instead.
+Self-evaluation through this MCP server: `commit_submission` for a self review stays gated until mapped. For the Workday App Builder native agent, use `agents/prch-submit-skill` (UI handoff: preview saved answers, explicit yes, deep link to the worker's own Complete Self Evaluation inbox task; no submit/advance/skip tool calls). Do not use any other business-process or manager tool as a substitute.
 
 Every write:
 1. Call the preview tool. Show the user the complete exact content returned (never a shortened version).
