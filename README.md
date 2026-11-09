@@ -52,7 +52,7 @@ Claude Desktop: `pnpm build`, use `examples/claude_desktop_config.json`, load `s
 Same as Internal People Agent: `DATABASE_URL`, `WORKDAY_MCP_URL`, `WORKDAY_MCP_TOKEN_FILE` (your own token, chmod 600), `WORKDAY_MCP_MAPPING_PATH` (from `examples/workday-mcp-mapping.example.json`), `ROLE_MAP_PATH`, then `MODE=live pnpm start`. Optional `GITHUB_TOKEN_FILE` with your own read-only token.
 
 ## Docs
-[ARCHITECTURE](docs/ARCHITECTURE.md), [SECURITY](docs/SECURITY.md), [HANDOVER](HANDOVER.md), [CHANGELOG](CHANGELOG.md), [AGENTS](AGENTS.md).
+[ARCHITECTURE](docs/ARCHITECTURE.md), [SECURITY](docs/SECURITY.md) (includes Required Workday security), [HANDOVER](HANDOVER.md), [CHANGELOG](CHANGELOG.md), [AGENTS](AGENTS.md).
 
 ## Provenance
 `src/core/` adapts security ideas from `peopletechflow/workday-mcp-schema` at `4bf10b27b025a48b0882d98ab65983fdba271159` (MIT, same owner). That repository is unchanged; its time-off support does not imply review-write support.

@@ -15,6 +15,9 @@
 2. From the printed input schemas, add `args` for wd_goal_status, wd_review_template, wd_bp_event, wd_bp_remaining_steps and the three writes. Record one identity response and set `resultPath`/`fieldMap` for identity and goals_read.
 3. Ask the tenant owner for a self-evaluation submit action. Until one exists, self_review_submit stays gated.
 
+## Required Workday security (2026-11-09)
+Tenant domain grants decide what each App Builder tool can reach. Do not grant `All Employees` (or other company-wide groups) on Worker Data domains for review or anytime feedback. Employees should use Self-Service domains with Employee As Self; managers use the Manager role (team only); HR / Talent roles stay as configured. Full per-tool table, the Anytime Feedback domain change, and the View User Permissions for Tool check: [docs/SECURITY.md](docs/SECURITY.md#required-workday-security).
+
 ## Security boundaries (2026-11-08 hardening)
 - **Subject arguments.** Any upstream argument that picks a person (worker, employee, user, target, recipient, contextInstanceId, me, wid, ...) must be `{"caller":"workerId"}`, which is filled from the authenticated identity at call time and never from input. Exceptions: `contextInstanceId:"me"` or `me:true` as constants, and inputs a capability lists in `objectInputs`, which its tool resolves server-side (for example the feedback recipient comes from the caller's own feedback request). Anything else is gated at startup. Record IDs (goalId, eventId, reviewId) are not subjects; Workday authorizes them under the caller's own token.
 - **Prohibited tools.** Manager, HR and payroll tools (`initiate_change_job`, `approve_business_process_event_step`, `request_payroll_input`, `initiate_performance_review_for_employee`) are refused for every capability, matched case- and punctuation-insensitively. This list does not prove anything about unknown tools. The explicit mapping allowlist plus tools/list contract checks remain the boundary.

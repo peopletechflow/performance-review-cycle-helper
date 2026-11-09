@@ -1,6 +1,6 @@
 # Agent Gateway security design
 
-Workday's Agent-Ready tools are for agents only. Their names and schemas change without notice, and prompts must not bind to tool names. This server therefore never lets the model call an arbitrary Workday tool. Workday security groups (ASOR) limit what the agent system user can reach. They do not stop an agent with broad grants from reaching into another person's data, so this code adds its own limits on top.
+Workday's Agent-Ready tools are for agents only. Their names and schemas change without notice, and prompts must not bind to tool names. This server therefore never lets the model call an arbitrary Workday tool. Workday security groups (ASOR) limit what the agent system user can reach. They do not stop an agent with broad grants from reaching into another person's data, so this code adds its own limits on top. Domain grants for the App Builder tools (Self-Service vs Worker Data, and the ban on All Employees for feedback Worker Data) are documented in [SECURITY.md](SECURITY.md#required-workday-security).
 
 ## Layers, from outermost to innermost
 1. **Capability ceilings in code** (`src/agent-capabilities.ts`). Each capability, such as `goals.self.read`, states its access (read or write), the project role permission it needs, and its consent scope. It also says whether it is enabled at all. One MCP tool is generated per enabled ceiling (`workday_goals_self_read`, or a `_preview`/`_commit` pair for a write). These tools run through the normal role, deny and consent checks. There is no tool that calls any tool.

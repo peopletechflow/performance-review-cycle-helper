@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased: Required Workday security docs
+
+- Documented required Workday domain grants per App Builder tool in `docs/SECURITY.md`: employees via Self-Service / Employee As Self, managers via Manager (team), no All Employees on Worker Data: Anytime Feedback. Added verification via View User Permissions for Tool. Linked from README, HANDOVER, and AGENTS.md.
+
 ## Unreleased: Workday App Builder catalog
 
 - Added the 17 tenant-verified App Builder tool names and WIDs (`src/catalog.ts`) and a mapping that uses them (`examples/workday-app-builder.mapping.json`).
