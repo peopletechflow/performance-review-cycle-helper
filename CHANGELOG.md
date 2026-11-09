@@ -4,6 +4,7 @@
 
 - Added Workday App Builder native agent package under `agents/`: `performance-review-cycle-helper.agent` plus `prch-submit-skill`, `prch-goals-skill`, `prch-draft-skill`, `prch-mine-skill` and `prch-review-status-skill`.
 - `prch-submit-skill` is a UI handoff: reads status via `find_performance_review_self_evaluations` and section read tools (`find_review_questions_sections`, list goal/competency/overall sections), previews saved answers, gets an explicit yes, then deep-links the worker to their own Complete Self Evaluation inbox task so they click Submit in Workday. Never calls submit_task_type, submit_questionnaire, advance or skip. Self scope only.
+- README Demo: looping GIF under `docs/media/performance-review-cycle-helper-demo.gif` linked to the Vimeo full demo (`https://vimeo.com/1245191425`).
 - Finding (2026-11-09): Workday Developer Agent confirmed none of the 671 agent-ready MCP tools can submit a performance review self-evaluation (Initiation step of the Self Evaluation sub-process; REST `performanceEnablement` selfEvaluations submit has no MCP wrapper). Documented in README Main Logic.
 - Docs: README Main Logic, TENANT_METADATA, HANDOVER, AGENTS and the MCP `performance-submit-skill` describe the handoff. MCP `commit_submission` for self reviews stays gated until mapped through the gateway.
 

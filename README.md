@@ -2,7 +2,11 @@
 
 Run your own review cycle in Claude: evidence you opted in to, drafts in your own voice, and a submission only after you confirm.
 
-<!-- Demo slot: the Performance demo video goes here, directly under the tagline, once real footage exists. -->
+## Demo
+
+[![Performance Review Cycle Helper · Workday MCP demo](docs/media/performance-review-cycle-helper-demo.gif)](https://vimeo.com/1245191425)
+
+[Watch the full demo on Vimeo](https://vimeo.com/1245191425). Real footage from a Workday developer sandbox: the agent reads review status and goals, drafts self-evaluation text from Workday data, then the worker pastes into Complete Self Evaluation and clicks Submit in Workday (UI handoff; no agent submit tool).
 
 ## About
 
