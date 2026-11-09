@@ -27,7 +27,9 @@ flowchart LR
 - **Draft.** Claude drafts and you are the author. Citations must match collected evidence. There are no rating, ranking or outcome fields, and drafting rules ban sensitive-trait inference.
 - **Preview.** `preview_submission` stores a single-use token bound to you, the draft version and the exact payload. Edits make a new version and invalidate the preview.
 - **Submit.** `commit_submission` on the MCP server runs only with `confirm: true` and an idempotency key. Unknown outcomes are never retried automatically; `reconcile_my_submission` checks them. Submitted drafts are locked.
-- **App Builder native submit.** The Workday App Builder agent in `agents/` submits the signed-in worker's own Complete Self Evaluation step only through `prch-submit-skill`, after a preview and an explicit yes. Submit sends the answers already saved in the Workday task. Never manager or other workers' steps. Native agent files: [agents/](agents/).
+- **App Builder native submit (UI handoff).** The Workday App Builder agent in `agents/` uses `prch-submit-skill` to preview the signed-in worker's own saved Complete Self Evaluation answers, get an explicit yes, then hand off a deep link to that worker's own inbox task so they click Submit in Workday. It does not call submit, advance or skip tools. Employees see only their own review; managers only their team. Native agent files: [agents/](agents/).
+
+**Finding (2026-11-09):** the Workday Developer Agent confirmed that none of the 671 agent-ready MCP tools can submit a performance review self-evaluation. That step is an Initiation step (`d8c892f4446c11de98360015c5e6daf6`) of the Self Evaluation sub-process. `submit_task_type` fails with "not a Tasks type event"; `submit_questionnaire` fails with "Specify a questionnaire response"; the underlying REST is `performanceEnablement` selfEvaluations submit with no MCP wrapper. Submission stays a UI handoff until Workday ships one.
 
 MCP `commit_submission` for self reviews stays gated until mapped through the gateway. Status, capabilities and the full lifecycle: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

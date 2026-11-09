@@ -41,7 +41,7 @@ export const APP_BUILDER_CATALOG: readonly CatalogEntry[] = [
 
 /** Known gaps in the supplied catalog. */
 export const CATALOG_GAPS = [
-  "MCP gateway: commit_submission for self reviews (capability self_review_submit) stays gated until mapped. App Builder native self-evaluation submit is in agents/prch-submit-skill (submit_task_type_business_process_event_step). Those WIDs are not yet entries in this MCP catalog array. No generic business-process submit is wired through the MCP gateway.",
+  "MCP gateway: commit_submission for self reviews (capability self_review_submit) stays gated until mapped. App Builder native path is the UI handoff in agents/prch-submit-skill: none of the 671 agent-ready MCP tools can submit a performance review self-evaluation (Initiation step; performanceEnablement selfEvaluations submit has no MCP wrapper). No generic business-process submit is wired through the MCP gateway.",
   "No action that submits requested peer feedback inside a review is in the catalog (peer_feedback_submit stays gated). Anytime feedback (create_anytime_feedback_events) is a different object and is exposed separately.",
   "Input and output schemas were not exported. Argument names are read from tools/list at startup; response field paths for identity and goals must be set in the mapping (resultPath, fieldMap) from a recorded response.",
   "No tool to look up an anytime feedback event or goal event by idempotency key, so unknown write outcomes cannot be reconciled automatically; the user checks Workday.",
