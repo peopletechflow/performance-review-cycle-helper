@@ -2,7 +2,7 @@
 
 ## Status
 
-This project is experimental and has not been security-reviewed by a third party. It has not run against a production Workday tenant. Do not use it with real employee data until you have done your own review. Live Workday behaviour depends on your tenant's configuration, and that configuration is not verified by this repository's tests.
+This project has not been security-reviewed by a third party. It has not run against a production Workday tenant. Do not use it with real employee data until you have done your own review. Live Workday behaviour depends on your tenant's configuration, and that configuration is not verified by this repository's tests.
 
 ## Reporting a vulnerability
 
