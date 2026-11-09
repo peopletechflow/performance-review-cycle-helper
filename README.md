@@ -1,6 +1,10 @@
 # Performance Review Cycle Helper | Workday MCP
 
-> **Status: experimental.** This is an independent project and is not affiliated with or endorsed by Workday. It has not been run against a production Workday tenant, and live adapters only work for capabilities your tenant mapping verifies (everything else is gated). Fixture data is invented. Security: see [SECURITY.md](SECURITY.md). Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md). CI is a template in `docs/ci-workflow.example.yml` and is not active until it is installed.
+> **Security.** Self-scoped by design: employees work their own review cycle; evidence needs explicit opt-in; writes use preview then confirm. Live adapters stay gated until your tenant mapping verifies each capability. Configure Workday domain security so employees reach only their own reviews and managers only their team (see [SECURITY.md](SECURITY.md#required-workday-security)). Report vulnerabilities via [SECURITY.md](SECURITY.md).
+>
+> **Contributing.** Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+>
+> **Scope.** Independent project, not affiliated with or endorsed by Workday. Verified live in a Workday developer sandbox (App Builder tools and agent skills against the signed-in user's own performance records). Not yet run against a production Workday tenant. Fixture data is invented. CI is a template in `docs/ci-workflow.example.yml` and is not active until it is installed.
 
 
 An independent, task-shaped **Workday MCP** server plus a Claude skill. Not affiliated with, endorsed by, or certified by Workday, Inc.; Workday is a trademark of Workday, Inc.
@@ -59,6 +63,12 @@ Same as Internal People Agent: `DATABASE_URL`, `WORKDAY_MCP_URL`, `WORKDAY_MCP_T
 
 ## CI
 Workflow ready in `docs/ci-workflow.example.yml`; enabling it needs the `workflow` permission.
+
+## License and disclaimer
+
+MIT. See [LICENSE](LICENSE).
+
+This software is provided as is, without warranty of any kind. The maintainers and PeopleTech Flow B.V. accept no responsibility or liability for any use, data, HR decisions, or outcomes. You are responsible for reviewing, securing, and testing it in your own tenant and for complying with your Workday agreements and applicable law.
 
 ## Workday App Builder catalog (tenant-verified)
 
