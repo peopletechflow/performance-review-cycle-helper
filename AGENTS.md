@@ -8,3 +8,5 @@
 - No em dashes in docs or user-facing text.
 - New Workday data needs a capability in `src/capabilities.ts`, a fixture handler and a test-double contract test. New evidence sources implement `EvidenceProvider`, need opt-in, and return only the user's own items.
 - Tenant domain security is operator-owned. Never document or assume All Employees on Worker Data domains for feedback or reviews; see docs/SECURITY.md#required-workday-security.
+
+- Workday App Builder native agent and skills live in `agents/` (`.agent` / `.agentskill`). Self-evaluation submit is available only through `prch-submit-skill` for the signed-in worker's own awaiting step, after a preview and an explicit yes. Submit sends answers already saved in the Workday task. Never manager or other workers' steps.

@@ -20,10 +20,12 @@ What is verified, and what is still open:
 | Input argument names | Not exported. Run `pnpm mapping:check` (read only: tools/list, no tool calls) and add `args` for inputs such as goalId, eventId, reviewId, and the write fields. Until then those capabilities stay gated and say which input is missing. |
 | Response shapes | Not exported. Mined reads come back as bounded, quoted data. Identity (`find_staffing_workers`) and `goals_read` need `resultPath`/`fieldMap` taken from a recorded response. |
 | Live calls from this repo | Not run yet |
-| Self-evaluation submit | **Gap.** The catalog has no action for this step, so `commit_submission` for self reviews stays gated. Nothing generic is used in its place. |
+| Self-evaluation submit | **App Builder native:** `agents/prch-submit-skill` uses `submit_task_type_business_process_event_step` (Tasks step) after preview and explicit yes; sends answers already saved in the Workday task. **MCP gateway:** `commit_submission` for self reviews stays gated until mapped. To Do steps may use `submit_todo_business_process_event_step` (docs only; not wired in the skill). |
 | Peer feedback inside a review | **Gap.** `create_anytime_feedback_events` is anytime feedback, which is a separate object. |
 | Reconciling an unknown write | **Gap.** There is no lookup by idempotency key. The user checks Workday. |
 
 Secured tools: `collect_evidence` (Workday sources `wd_<tool>`, opt-in, reports ok/empty/access_denied), `get_my_open_review`, `get_review_period_suggestion`, `get_goal_status`, `get_my_review_step_status`, `preview_/commit_goal_update` (edit_worker_goals, then submit_worker_goal_events if chosen), `preview_/commit_anytime_feedback` (create_anytime_feedback_events; recipient must come from your own feedback request).
 
-Repo-local skills: `skills/performance-mine-skill`, `skills/performance-draft-skill`, `skills/performance-submit-skill`. Their `allowed-tools` list only these secured tools, never the raw upstream write names (a test enforces this).
+Repo-local Claude/MCP skills: `skills/performance-mine-skill`, `skills/performance-draft-skill`, `skills/performance-submit-skill`. Their `allowed-tools` list only these secured tools, never the raw upstream write names (a test enforces this).
+
+Workday App Builder native agent package: `agents/` (`performance-review-cycle-helper.agent` and the `prch-*.agentskill` files, including `prch-submit-skill`).
