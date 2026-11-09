@@ -34,3 +34,30 @@ Workday's Agent-Ready tools are for agents only. Their names and schemas change 
 
 ## What is not proven
 Nothing has been run against a live tenant. Refresh uses the standard OAuth grant, because Workday does not document it. Writes are disabled. Capabilities with no verified tool simply show as unavailable.
+
+## Running in Agent Gateway mode
+
+Based on Workday's public docs, read 2026-11-08:
+- Agent-Ready MCP Tools: https://developer.workday.com/documentation/GUID-949559e7-10c3-438a-abb2-e452c23d9da8-enHYPHENus/AgentReadyMCPTools
+- Connect an External Agent with Workday MCP: https://developer.workday.com/documentation/GUID-03605c39-71d3-4314-bf71-97f274df457c-enHYPHENus/ConnectanExternalAgentwithWorkdayMCP
+- Developer Guidelines & Change Policy: https://developer.workday.com/documentation/GUID-04498a6d-10ba-4a41-a917-9fa668641b8d-enHYPHENus/WorkdayAgentReadyMCPToolsDeveloperGuidelinesChangePolicy
+- Discover Available Agent-Ready MCP Tools (MCP Explorer, Agent Resource Search): https://developer.workday.com/documentation/GUID-f86470b2-4283-48e6-8d7e-18c91c470878-enHYPHENus
+- Configure External Agents / Authenticate Agents to Agent Gateway: https://doc.workday.com/admin-guide/en-us/workday-ai/agents/external-agents/configure-external-agents.html and https://doc.workday.com/admin-guide/en-us/workday-ai/agents/onboard-partner-agent-to-agent-gateway.html
+
+Operator steps in Workday (this repository cannot do them): set up ASOR; register the agent and its skills and tools; configure it (enable skills, choose security groups, set the redirect URI); copy the one-time client ID and secret; activate it, which creates the Agent System User (ASU); and configure security policies for the agent's skills.
+
+Runtime:
+1. Run `pnpm asu:login` (with `WORKDAY_AGENT_GATEWAY`, `WORKDAY_TENANT_ALIAS`, `ASU_CLIENT_ID`, `ASU_CLIENT_SECRET_FILE`, `ASU_REDIRECT_URI` and `ASU_SESSION_FILE` set). It walks through the authorization code flow with PKCE: `GET https://{gateway}/auth/authorize/{tenant}`, then `POST https://{gateway}/auth/oauth2/{tenant}/token`. The session file is written atomically with mode 600, and symlinks or loose permissions are refused.
+2. Run `pnpm agent-tools:snapshot` (read only). It lists the tools this agent can see, with contract fingerprints. Write `AGENT_TOOL_POLICY_PATH` from it after review; `examples/agent-tool-policy.example.json` shows the format.
+3. `MODE=live pnpm start`. The server connects to `https://{gateway}/{tenant}/mcp` with the ASU token and resolves the worker through the policy's identity tool. It then exposes `workday_list_agent_tools` and one tool per enabled capability ceiling (for example `workday_goals_self_read`). There is no generic call tool, and Agent Gateway writes are off by default. See [Layers](#layers-from-outermost-to-innermost).
+
+Behaviour:
+- Discovery is paginated. The tool list is refreshed on `notifications/tools/list_changed`, after a 5-minute TTL, and always right before a commit.
+- A renamed, removed or schema-changed tool turns off until it is re-approved. Description rewrites are not treated as changes.
+- If a write tool's contract changes between preview and commit, nothing is sent.
+- Person fields at any depth are filled from the authenticated worker. Schemas that cannot be bound safely are refused, and tools that take record ids or free-form text are unavailable, because ownership of ids cannot be proven from Workday's contract. Reads need the tool annotated read-only. The manager, HR and payroll denylist is defence in depth only.
+- The fixed review tools (`commit_submission` and the others) are off in this mode, because Workday's tools are for agents only and must not be hard-coded.
+
+Access tokens last 60 minutes (documented) and are refreshed before expiry. The refresh request shape is not in the public docs, so it uses the standard OAuth `refresh_token` grant. Any refresh failure ends the session and requires signing in again; nothing falls back to another credential. Revoking access is a Workday-side action (deactivate the agent). Ambient (x509 JWT) agents are not implemented. Not yet run against a live tenant.
+
+Direct mapping mode (`WORKDAY_MCP_URL` + a fixed token file) is for other MCP servers you run yourself, outside production only. A fixed bearer token is not an ASU session.
